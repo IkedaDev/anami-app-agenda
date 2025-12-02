@@ -4,18 +4,21 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  SafeAreaView,
+  Platform,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+// 1. IMPORTAR DESDE LA LIBRERÍA CORRECTA
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+
 import { AppointmentProvider } from "./src/core/context/AppointmentContext";
-import { PatientProvider } from "./src/core/context/PatientContext"; // Importar nuevo contexto
+import { PatientProvider } from "./src/core/context/PatientContext";
 import AppointmentScreen from "./src/presentation/screens/AppointmentScreen";
 import HistoryScreen from "./src/presentation/screens/HistoryScreen";
-import PatientsScreen from "./src/presentation/screens/PatientsScreen"; // Importar nueva pantalla
+import PatientsScreen from "./src/presentation/screens/PatientsScreen";
 import { COLORS } from "./src/core/theme/colors";
 import { Appointment } from "./src/domain/models/appointment";
 
-type ScreenType = "add" | "history" | "patients"; // Agregar tipo
+type ScreenType = "add" | "history" | "patients";
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>("add");
@@ -38,125 +41,129 @@ export default function App() {
   };
 
   return (
-    <AppointmentProvider>
-      <PatientProvider>
-        <View style={styles.container}>
-          <StatusBar style="dark" />
+    // 2. ENVOLVER TODA LA APP EN EL PROVIDER
+    <SafeAreaProvider>
+      <AppointmentProvider>
+        <PatientProvider>
+          <View style={styles.container}>
+            <StatusBar style="dark" />
 
-          <View style={styles.content}>
-            {currentScreen === "add" ? (
-              <AppointmentScreen
-                appointmentToEdit={appointmentToEdit}
-                onSuccess={handleEditComplete}
-              />
-            ) : currentScreen === "history" ? (
-              <HistoryScreen onEdit={handleEditRequest} />
-            ) : (
-              <PatientsScreen />
-            )}
-          </View>
+            <View style={styles.content}>
+              {currentScreen === "add" ? (
+                <AppointmentScreen
+                  appointmentToEdit={appointmentToEdit}
+                  onSuccess={handleEditComplete}
+                />
+              ) : currentScreen === "history" ? (
+                <HistoryScreen onEdit={handleEditRequest} />
+              ) : (
+                <PatientsScreen />
+              )}
+            </View>
 
-          <SafeAreaView style={styles.navBarContainer}>
-            <View style={styles.navBarContent}>
-              <TouchableOpacity
-                style={styles.navItem}
-                onPress={() => handleTabPress("add")}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.iconPlaceholder,
-                    currentScreen === "add" && styles.iconActive,
-                  ]}
+            {/* 3. USAR EL SAFE AREA VIEW CON 'EDGES' ESPECÍFICOS */}
+            {/* Esto agrega padding automático en la parte inferior para evitar los botones de Android */}
+            <SafeAreaView edges={["bottom"]} style={styles.navBarContainer}>
+              <View style={styles.navBarContent}>
+                <TouchableOpacity
+                  style={styles.navItem}
+                  onPress={() => handleTabPress("add")}
+                  activeOpacity={0.7}
                 >
+                  <View
+                    style={[
+                      styles.iconPlaceholder,
+                      currentScreen === "add" && styles.iconActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.iconText,
+                        currentScreen === "add" && styles.textActive,
+                      ]}
+                    >
+                      +
+                    </Text>
+                  </View>
                   <Text
                     style={[
-                      styles.iconText,
+                      styles.navText,
                       currentScreen === "add" && styles.textActive,
                     ]}
                   >
-                    +
+                    Agendar
                   </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.navText,
-                    currentScreen === "add" && styles.textActive,
-                  ]}
-                >
-                  Agendar
-                </Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              <View style={styles.separator} />
+                <View style={styles.separator} />
 
-              <TouchableOpacity
-                style={styles.navItem}
-                onPress={() => handleTabPress("history")}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.iconPlaceholder,
-                    currentScreen === "history" && styles.iconActive,
-                  ]}
+                <TouchableOpacity
+                  style={styles.navItem}
+                  onPress={() => handleTabPress("history")}
+                  activeOpacity={0.7}
                 >
+                  <View
+                    style={[
+                      styles.iconPlaceholder,
+                      currentScreen === "history" && styles.iconActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.iconText,
+                        currentScreen === "history" && styles.textActive,
+                      ]}
+                    >
+                      H
+                    </Text>
+                  </View>
                   <Text
                     style={[
-                      styles.iconText,
+                      styles.navText,
                       currentScreen === "history" && styles.textActive,
                     ]}
                   >
-                    H
+                    Historial
                   </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.navText,
-                    currentScreen === "history" && styles.textActive,
-                  ]}
-                >
-                  Historial
-                </Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              <View style={styles.separator} />
+                <View style={styles.separator} />
 
-              {/* NUEVO BOTÓN: CLIENTES */}
-              <TouchableOpacity
-                style={styles.navItem}
-                onPress={() => handleTabPress("patients")}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.iconPlaceholder,
-                    currentScreen === "patients" && styles.iconActive,
-                  ]}
+                <TouchableOpacity
+                  style={styles.navItem}
+                  onPress={() => handleTabPress("patients")}
+                  activeOpacity={0.7}
                 >
+                  <View
+                    style={[
+                      styles.iconPlaceholder,
+                      currentScreen === "patients" && styles.iconActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.iconText,
+                        currentScreen === "patients" && styles.textActive,
+                      ]}
+                    >
+                      C
+                    </Text>
+                  </View>
                   <Text
                     style={[
-                      styles.iconText,
+                      styles.navText,
                       currentScreen === "patients" && styles.textActive,
                     ]}
                   >
-                    C
+                    Clientes
                   </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.navText,
-                    currentScreen === "patients" && styles.textActive,
-                  ]}
-                >
-                  Clientes
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </View>
-      </PatientProvider>
-    </AppointmentProvider>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </View>
+        </PatientProvider>
+      </AppointmentProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -172,6 +179,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 5,
     elevation: 10,
+    // Eliminamos altura fija o paddings manuales aquí, el SafeAreaView se encarga
   },
   navBarContent: {
     flexDirection: "row",

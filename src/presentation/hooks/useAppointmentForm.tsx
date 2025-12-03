@@ -4,9 +4,11 @@ import {
   Appointment,
   AppointmentState,
   FinancialSummary,
-  PRICE_LIST,
+  HOTEL_PRICES,
+  PARTICULAR_SERVICES,
   MassageDuration,
   FacialType,
+  ServiceMode,
 } from "../../domain/models/appointment";
 import { useAppointments } from "../../core/context/AppointmentContext";
 import { usePatients } from "../../core/context/PatientContext";
@@ -20,11 +22,11 @@ const generateUUID = () => {
   });
 };
 
-// 1. Lógica base de slots
+// 1. Lógica base de slots (Actualizada: 8 AM a 11 PM)
 const generateRawTimeSlots = () => {
   const slots = [];
-  const startHour = 9;
-  const endHour = 20;
+  const startHour = 8; // Inicio: 08:00
+  const endHour = 23; // Fin: 23:00 (11 PM)
 
   for (let h = startHour; h < endHour; h++) {
     for (let m = 0; m < 60; m += 10) {
@@ -36,7 +38,6 @@ const generateRawTimeSlots = () => {
   return slots;
 };
 
-// Helper para convertir string "HH:mm" de hoy a Timestamp
 const getTimestampForTime = (timeStr: string): number => {
   const now = new Date();
   const [hours, minutes] = timeStr.split(":").map(Number);
@@ -52,7 +53,7 @@ const getTimestampForTime = (timeStr: string): number => {
   return date.getTime();
 };
 
-// 2. NUEVA FUNCIÓN INTELIGENTE: Encuentra el primer slot futuro DISPONIBLE
+// 2. FUNCIÓN CORREGIDA: Encuentra el primer slot disponible o devuelve VACÍO
 const findBestAvailableTime = (appointments: Appointment[]) => {
   const slots = generateRawTimeSlots();
   const now = new Date();
@@ -64,7 +65,8 @@ const findBestAvailableTime = (appointments: Appointment[]) => {
     return h > currentHour || (h === currentHour && m > currentMinute);
   });
 
-  if (startIndex === -1) startIndex = 0;
+  // Si ya pasó la hora de atención por hoy, no seleccionar nada
+  if (startIndex === -1) return "";
 
   for (let i = startIndex; i < slots.length; i++) {
     const time = slots[i];
@@ -80,7 +82,9 @@ const findBestAvailableTime = (appointments: Appointment[]) => {
     if (!isTaken) return time;
   }
 
-  return slots[startIndex] || slots[0];
+  // Si llegamos aquí, significa que revisamos todo el día y todo está ocupado.
+  // Devolvemos vacío para no pre-seleccionar una hora ocupada.
+  return "";
 };
 
 export const useAppointmentForm = (
@@ -90,47 +94,53 @@ export const useAppointmentForm = (
   const { addAppointment, updateAppointment, appointments } = useAppointments();
   const { patients } = usePatients();
 
-  const [formState, setFormState] = useState<AppointmentState>({
+  // Extendemos el estado local para soportar array de IDs
+  const [formState, setFormState] = useState<
+    AppointmentState & { selectedServiceIds: string[] }
+  >({
     date: "",
     patientName: "",
     patientId: undefined,
+    serviceMode: "hotel",
     duration: null as any,
     hasNailCut: false,
     facialType: "no",
-    isHotelService: false,
+    selectedServiceIds: [],
     selectedTime: "",
   });
 
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // NUEVO HELPER: Calcula la duración total combinada
-  const getTotalDuration = () => {
-    let total = 0;
-    // Masaje (si existe)
-    if (formState.duration) total += formState.duration;
-    // Uñas: 10 min
-    if (formState.hasNailCut) total += 10;
-    // Facial: 60 min
-    if (formState.facialType !== "no") total += 60;
-
-    return total;
+  // --- HELPER: OBTENER DURACIÓN REAL ---
+  const getCurrentDuration = () => {
+    if (formState.serviceMode === "hotel") {
+      let total = 0;
+      if (formState.duration) total += formState.duration;
+      if (formState.hasNailCut) total += 10;
+      if (formState.facialType !== "no") total += 60;
+      return total;
+    } else {
+      // Modo Particular: Suma de todos los servicios seleccionados
+      let total = 0;
+      formState.selectedServiceIds.forEach((id) => {
+        const service = PARTICULAR_SERVICES.find((s) => s.id === id);
+        if (service) total += service.duration;
+      });
+      return total;
+    }
   };
 
-  // 3. CALCULAR DISPONIBILIDAD DE SLOTS (Para la UI)
+  // --- CÁLCULO DE SLOTS ---
   const timeSlots = useMemo(() => {
     const rawSlots = generateRawTimeSlots();
     const nowTimestamp = Date.now();
 
-    // Calculamos duración total para verificar disponibilidad
-    // Si es 0 (nada seleccionado), usamos 10 min por defecto para la verificación
-    const currentTotalDuration = getTotalDuration() || 10;
+    const currentTotalDuration = getCurrentDuration() || 10;
 
     const mappedSlots = rawSlots.map((time) => {
       const slotStart = getTimestampForTime(time);
-
       const durationMs = currentTotalDuration * 60 * 1000;
       const slotEnd = slotStart + durationMs;
-
       const isPast = slotStart < nowTimestamp - 60000;
 
       const isTaken = appointments.some((appt) => {
@@ -139,28 +149,15 @@ export const useAppointmentForm = (
         return slotStart < appt.scheduledEnd && slotEnd > appt.scheduledStart;
       });
 
-      return {
-        time,
-        available: !isTaken && !isPast,
-        isPast,
-      };
+      return { time, available: !isTaken && !isPast, isPast };
     });
 
     const futureSlots = mappedSlots.filter((slot) => !slot.isPast);
     const firstAvailableIndex = futureSlots.findIndex((slot) => slot.available);
 
-    if (firstAvailableIndex > 0) {
-      return futureSlots.slice(firstAvailableIndex);
-    }
-
+    if (firstAvailableIndex > 0) return futureSlots.slice(firstAvailableIndex);
     return futureSlots;
-  }, [
-    appointments,
-    formState.duration,
-    formState.hasNailCut,
-    formState.facialType,
-    appointmentToEdit,
-  ]);
+  }, [appointments, formState, appointmentToEdit]);
 
   const suggestions = useMemo(() => {
     if (!formState.patientName || !showSuggestions) return [];
@@ -170,16 +167,28 @@ export const useAppointmentForm = (
       .slice(0, 5);
   }, [patients, formState.patientName, showSuggestions]);
 
+  // --- INICIALIZACIÓN ---
   useEffect(() => {
     if (appointmentToEdit) {
+      const mode =
+        appointmentToEdit.serviceMode ||
+        ((appointmentToEdit as any).isHotelService ? "hotel" : "particular");
+
+      const serviceIds =
+        (appointmentToEdit as any).selectedServiceIds ||
+        ((appointmentToEdit as any).selectedServiceId
+          ? [(appointmentToEdit as any).selectedServiceId]
+          : []);
+
       setFormState({
         date: appointmentToEdit.date,
         patientName: appointmentToEdit.patientName,
         patientId: appointmentToEdit.patientId,
+        serviceMode: mode,
         duration: appointmentToEdit.duration,
         hasNailCut: appointmentToEdit.hasNailCut,
         facialType: appointmentToEdit.facialType,
-        isHotelService: appointmentToEdit.isHotelService,
+        selectedServiceIds: serviceIds,
         selectedTime: appointmentToEdit.selectedTime || "",
       });
     } else {
@@ -203,22 +212,29 @@ export const useAppointmentForm = (
     }
   }, [appointmentToEdit]);
 
+  // --- CÁLCULO FINANCIERO ---
   const financialSummary: FinancialSummary = useMemo(() => {
     let currentTotal = 0;
 
-    if (formState.duration) {
-      currentTotal += PRICE_LIST.massage[formState.duration];
+    if (formState.serviceMode === "hotel") {
+      if (formState.duration)
+        currentTotal +=
+          HOTEL_PRICES.massage[formState.duration as 20 | 40] || 0;
+      currentTotal += formState.hasNailCut
+        ? HOTEL_PRICES.nails.yes
+        : HOTEL_PRICES.nails.no;
+      currentTotal += HOTEL_PRICES.facial[formState.facialType];
+    } else {
+      formState.selectedServiceIds.forEach((id) => {
+        const service = PARTICULAR_SERVICES.find((s) => s.id === id);
+        if (service) currentTotal += service.price;
+      });
     }
-
-    currentTotal += formState.hasNailCut
-      ? PRICE_LIST.nails.yes
-      : PRICE_LIST.nails.no;
-    currentTotal += PRICE_LIST.facial[formState.facialType];
 
     let anami = 0;
     let hotel = 0;
 
-    if (formState.isHotelService) {
+    if (formState.serviceMode === "hotel") {
       anami = currentTotal * 0.6;
       hotel = currentTotal * 0.4;
     } else {
@@ -226,17 +242,36 @@ export const useAppointmentForm = (
       hotel = 0;
     }
 
-    return {
-      total: currentTotal,
-      anamiShare: anami,
-      hotelShare: hotel,
-    };
-  }, [
-    formState.duration,
-    formState.hasNailCut,
-    formState.facialType,
-    formState.isHotelService,
-  ]);
+    return { total: currentTotal, anamiShare: anami, hotelShare: hotel };
+  }, [formState]);
+
+  // --- ACCIONES ---
+  const setServiceMode = (mode: ServiceMode) => {
+    setFormState((prev) => ({
+      ...prev,
+      serviceMode: mode,
+      duration: null as any,
+      selectedServiceIds: [],
+      hasNailCut: false,
+      facialType: "no",
+    }));
+  };
+
+  const toggleService = (id: string) => {
+    setFormState((prev) => {
+      const currentIds = prev.selectedServiceIds;
+      const exists = currentIds.includes(id);
+      let newIds;
+
+      if (exists) {
+        newIds = currentIds.filter((itemId) => itemId !== id);
+      } else {
+        newIds = [...currentIds, id];
+      }
+
+      return { ...prev, selectedServiceIds: newIds };
+    });
+  };
 
   const setPatientName = (text: string) => {
     setFormState((prev) => ({
@@ -262,17 +297,11 @@ export const useAppointmentForm = (
     setFormState((prev) => ({ ...prev, hasNailCut: value }));
   const setFacialType = (type: FacialType) =>
     setFormState((prev) => ({ ...prev, facialType: type }));
-  const setIsHotelService = (value: boolean) =>
-    setFormState((prev) => ({ ...prev, isHotelService: value }));
   const setSelectedTime = (time: string) =>
     setFormState((prev) => ({ ...prev, selectedTime: time }));
 
-  const calculateTimestamps = () => {
-    const startTimestamp = getTimestampForTime(formState.selectedTime);
-    // Usamos la duración total real para guardar
-    const totalDuration = getTotalDuration();
-    const endTimestamp = startTimestamp + totalDuration * 60 * 1000;
-    return { start: startTimestamp, end: endTimestamp };
+  const setIsHotelService = (value: boolean) => {
+    setServiceMode(value ? "hotel" : "particular");
   };
 
   const saveAppointment = () => {
@@ -283,43 +312,46 @@ export const useAppointmentForm = (
       );
       return;
     }
-
     if (!formState.selectedTime) {
-      Alert.alert(
-        "Falta información",
-        "Por favor selecciona una hora para la cita."
-      );
+      Alert.alert("Falta información", "Por favor selecciona una hora.");
       return;
     }
 
-    const hasService =
-      formState.duration ||
-      formState.hasNailCut ||
-      formState.facialType !== "no";
-    if (!hasService) {
-      Alert.alert(
-        "Sin servicios",
-        "Debes seleccionar al menos un servicio (Masaje, Uñas o Facial)."
-      );
-      return;
+    if (formState.serviceMode === "hotel") {
+      const hasService =
+        formState.duration ||
+        formState.hasNailCut ||
+        formState.facialType !== "no";
+      if (!hasService) {
+        Alert.alert("Sin servicios", "Debes seleccionar al menos un servicio.");
+        return;
+      }
+    } else {
+      if (formState.selectedServiceIds.length === 0) {
+        Alert.alert("Sin servicios", "Debes seleccionar al menos un servicio.");
+        return;
+      }
     }
 
     const slotData = timeSlots.find((s) => s.time === formState.selectedTime);
     if (slotData && !slotData.available) {
       Alert.alert(
         "Horario no disponible",
-        "El horario seleccionado ya pasó o choca con otra cita."
+        "El horario seleccionado choca con otra cita."
       );
       return;
     }
 
-    const timestamps = calculateTimestamps();
+    const startTimestamp = getTimestampForTime(formState.selectedTime);
+    const totalDuration = getCurrentDuration();
+    const endTimestamp = startTimestamp + totalDuration * 60 * 1000;
 
     const commonData = {
       ...formState,
       ...financialSummary,
-      scheduledStart: timestamps.start,
-      scheduledEnd: timestamps.end,
+      scheduledStart: startTimestamp,
+      scheduledEnd: endTimestamp,
+      duration: totalDuration,
     };
 
     if (appointmentToEdit) {
@@ -350,9 +382,10 @@ export const useAppointmentForm = (
         patientName: "",
         patientId: undefined,
         duration: null as any,
+        selectedServiceId: undefined,
+        selectedServiceIds: [],
         hasNailCut: false,
         facialType: "no",
-        isHotelService: false,
         selectedTime: findBestAvailableTime(appointments),
       }));
       setShowSuggestions(false);
@@ -368,11 +401,13 @@ export const useAppointmentForm = (
     actions: {
       setPatientName,
       selectPatient,
+      setServiceMode,
+      toggleService,
       setDuration,
       setHasNailCut,
       setFacialType,
-      setIsHotelService,
       setSelectedTime,
+      setIsHotelService,
       saveAppointment,
     },
   };

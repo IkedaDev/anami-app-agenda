@@ -8,22 +8,31 @@ import {
   StatusBar,
   Platform,
   TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useAppointments } from "../../core/context/AppointmentContext";
 import { COLORS } from "../../core/theme/colors";
-import { Appointment } from "../../domain/models/appointment";
+import {
+  Appointment,
+  PARTICULAR_SERVICES,
+} from "../../domain/models/appointment";
 
 interface HistoryScreenProps {
   onEdit: (appointment: Appointment) => void;
 }
 
 export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
-  const { appointments } = useAppointments();
+  const {
+    appointments,
+    loadMoreAppointments,
+    isLoadingMore,
+    refreshAppointments,
+    isLoading,
+  } = useAppointments();
 
-  // Estado para controlar el filtro: 'today' | 'month' | 'all'
   const [viewMode, setViewMode] = useState<"today" | "month" | "all">("today");
 
-  // Función auxiliar para validar si es hoy
   const isToday = (timestamp: number) => {
     const date = new Date(timestamp);
     const today = new Date();
@@ -34,7 +43,6 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     );
   };
 
-  // Función auxiliar para validar si es el mes actual
   const isCurrentMonth = (timestamp: number) => {
     const date = new Date(timestamp);
     const today = new Date();
@@ -44,7 +52,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     );
   };
 
-  // 1. FILTRADO DE DATOS
+  // 1. FILTRADO DE DATOS (Cliente)
   const filteredAppointments = useMemo(() => {
     if (viewMode === "all") {
       return appointments;
@@ -52,11 +60,10 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     if (viewMode === "month") {
       return appointments.filter((appt) => isCurrentMonth(appt.createdAt));
     }
-    // Por defecto 'today'
     return appointments.filter((appt) => isToday(appt.createdAt));
   }, [appointments, viewMode]);
 
-  // 2. CÁLCULOS DE RESUMEN (Basado en la lista filtrada)
+  // 2. CÁLCULOS DE RESUMEN
   const stats = useMemo(() => {
     const hotelAppointments = filteredAppointments.filter(
       (appt) => appt.isHotelService
@@ -81,12 +88,43 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
   const renderItem = ({ item }: { item: Appointment }) => {
     const editable = isToday(item.createdAt);
 
+    // Determinamos el modo de forma segura
+    const isHotel =
+      item.serviceMode === "hotel" ||
+      (item.isHotelService && item.serviceMode !== "particular");
+
+    const getParticularDetails = () => {
+      // AQUI ESTA EL CAMBIO IMPORTANTE:
+      // Usamos 'selectedServiceIds' (array) preferentemente.
+      // Mantenemos compatibilidad con 'selectedServiceId' (singular) por si hubiera datos viejos.
+      // Nota: TypeScript podría quejarse si 'selectedServiceId' ya no existe en la interfaz Appointment,
+      // así que usamos un cast a 'any' solo para acceder a la propiedad legacy de forma segura si fuera necesario,
+      // o confiamos en que la interfaz ya se actualizó.
+
+      const ids =
+        item.selectedServiceIds ||
+        ((item as any).selectedServiceId
+          ? [(item as any).selectedServiceId]
+          : []);
+
+      if (ids.length === 0) return "Servicio sin especificar";
+
+      return ids
+        .map((id) => {
+          const service = PARTICULAR_SERVICES.find((s) => s.id === id);
+          return service ? service.name : "Servicio desconocido";
+        })
+        .join(" + ");
+    };
+
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.patientName}>{item.patientName}</Text>
-            <Text style={styles.date}>{item.date}</Text>
+            <Text style={styles.date}>
+              {item.date} • {item.selectedTime}
+            </Text>
           </View>
 
           {editable && (
@@ -101,10 +139,18 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
         </View>
 
         <View style={styles.detailsRow}>
-          <Text style={styles.detailText}>Masaje {item.duration} min</Text>
-          {item.hasNailCut && <Text style={styles.detailText}>• Uñas</Text>}
-          {item.facialType !== "no" && (
-            <Text style={styles.detailText}>• Facial {item.facialType}</Text>
+          {isHotel ? (
+            <>
+              <Text style={styles.detailText}>Masaje {item.duration} min</Text>
+              {item.hasNailCut && <Text style={styles.detailText}>• Uñas</Text>}
+              {item.facialType !== "no" && (
+                <Text style={styles.detailText}>
+                  • Facial {item.facialType}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.detailText}>{getParticularDetails()}</Text>
           )}
         </View>
 
@@ -118,7 +164,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
             </Text>
           </View>
 
-          {item.isHotelService ? (
+          {isHotel ? (
             <View style={styles.hotelTag}>
               <Text style={styles.hotelTagText}>Hotel</Text>
             </View>
@@ -132,20 +178,8 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     );
   };
 
-  const getSummaryTitle = () => {
-    switch (viewMode) {
-      case "today":
-        return "Resumen del Día (Solo Hotel)";
-      case "month":
-        return "Resumen del Mes (Solo Hotel)";
-      case "all":
-        return "Resumen Histórico (Solo Hotel)";
-    }
-  };
-
   const ListHeader = () => (
     <View>
-      {/* SELECTOR DE VISTA */}
       <View style={styles.filterContainer}>
         <TouchableOpacity
           style={[
@@ -199,9 +233,14 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
         </TouchableOpacity>
       </View>
 
-      {/* TARJETA DE RESUMEN */}
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryHeaderTitle}>{getSummaryTitle()}</Text>
+        <Text style={styles.summaryHeaderTitle}>
+          {viewMode === "today"
+            ? "Resumen del Día (Solo Hotel)"
+            : viewMode === "month"
+            ? "Resumen del Mes (Solo Hotel)"
+            : "Resumen Histórico (Solo Hotel)"}
+        </Text>
 
         <View style={styles.summaryRowMain}>
           <Text style={styles.summaryLabelMain}>Total Recaudado</Text>
@@ -253,6 +292,15 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     </View>
   );
 
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={{ paddingVertical: 20 }}>
+        <ActivityIndicator size="small" color={COLORS.primary} />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
@@ -271,12 +319,24 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
           renderItem={renderItem}
           ListHeaderComponent={ListHeader}
           contentContainerStyle={styles.listContent}
+          onEndReached={loadMoreAppointments}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={refreshAppointments}
+              tintColor={COLORS.primary}
+            />
+          }
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>
-                No hay citas para este periodo.
-              </Text>
-            </View>
+            !isLoading ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>
+                  No hay citas para este periodo.
+                </Text>
+              </View>
+            ) : null
           }
         />
       </View>
@@ -457,6 +517,7 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 14,
     color: COLORS.textLight,
+    lineHeight: 20,
   },
   divider: {
     height: 1,

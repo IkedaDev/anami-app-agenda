@@ -15,7 +15,10 @@ import { COLORS } from "../../core/theme/colors";
 import { useAppointmentForm } from "../hooks/useAppointmentForm";
 import { OptionButton } from "../components/OptionButton";
 import { SectionTitle } from "../components/SectionTitle";
-import { Appointment } from "../../domain/models/appointment";
+import {
+  Appointment,
+  PARTICULAR_SERVICES,
+} from "../../domain/models/appointment";
 
 interface AppointmentScreenProps {
   appointmentToEdit?: Appointment | null;
@@ -51,6 +54,43 @@ export default function AppointmentScreen({
         </View>
 
         <View style={styles.card}>
+          {/* SELECTOR DE MODO (TABS) */}
+          <View style={styles.modeTabs}>
+            <TouchableOpacity
+              style={[
+                styles.modeTab,
+                formState.serviceMode === "hotel" && styles.modeTabActive,
+              ]}
+              onPress={() => actions.setServiceMode("hotel")}
+            >
+              <Text
+                style={[
+                  styles.modeTabText,
+                  formState.serviceMode === "hotel" && styles.modeTabTextActive,
+                ]}
+              >
+                Hotel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modeTab,
+                formState.serviceMode === "particular" && styles.modeTabActive,
+              ]}
+              onPress={() => actions.setServiceMode("particular")}
+            >
+              <Text
+                style={[
+                  styles.modeTabText,
+                  formState.serviceMode === "particular" &&
+                    styles.modeTabTextActive,
+                ]}
+              >
+                Particular
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* PACIENTE */}
           <View style={[styles.inputGroup, { zIndex: 100 }]}>
             <Text style={styles.label}>Paciente</Text>
@@ -83,7 +123,7 @@ export default function AppointmentScreen({
             </View>
           </View>
 
-          {/* SELECTOR DE HORA (Con Disponibilidad) */}
+          {/* TIME PICKER */}
           <View style={styles.inputGroup}>
             <SectionTitle title="Hora de Inicio" />
             <ScrollView
@@ -93,13 +133,7 @@ export default function AppointmentScreen({
             >
               {timeSlots.map((slot) => {
                 const isSelected = formState.selectedTime === slot.time;
-                const isAvailable = slot.available;
-
-                // Si está seleccionada (porque estaba guardada) pero ya no está disponible (ej: se superpone al editar), mostramos alerta visual
-                // pero permitimos verla. Lo normal es deshabilitar si !isAvailable y !isSelected.
-
-                const isDisabled = !isAvailable && !isSelected;
-
+                const isDisabled = !slot.available && !isSelected;
                 return (
                   <TouchableOpacity
                     key={slot.time}
@@ -126,76 +160,112 @@ export default function AppointmentScreen({
             </ScrollView>
           </View>
 
-          {/* DURACIÓN */}
-          <View style={styles.inputGroup}>
-            <SectionTitle title="Duración Masaje" />
-            <View style={styles.row}>
-              <OptionButton
-                label="20 min"
-                selected={formState.duration === 20}
-                onPress={() => actions.setDuration(20)}
-              />
-              <OptionButton
-                label="40 min"
-                selected={formState.duration === 40}
-                onPress={() => actions.setDuration(40)}
-              />
-            </View>
-          </View>
+          {/* --- FORMULARIO DINÁMICO SEGÚN MODO --- */}
 
-          {/* SERVICIOS EXTRA */}
-          <View style={styles.inputGroup}>
-            <SectionTitle title="Corte de Uñas" />
-            <View style={styles.row}>
-              <OptionButton
-                label="No"
-                selected={!formState.hasNailCut}
-                onPress={() => actions.setHasNailCut(false)}
-              />
-              <OptionButton
-                label="Sí (+$5.000)"
-                selected={formState.hasNailCut}
-                onPress={() => actions.setHasNailCut(true)}
-              />
-            </View>
-          </View>
+          {formState.serviceMode === "hotel" ? (
+            <>
+              {/* FORMULARIO HOTEL (ANTIGUO) */}
+              <View style={styles.inputGroup}>
+                <SectionTitle title="Masaje Express" />
+                <View style={styles.row}>
+                  <OptionButton
+                    label="20 min"
+                    selected={formState.duration === 20}
+                    onPress={() => actions.setDuration(20)}
+                  />
+                  <OptionButton
+                    label="40 min"
+                    selected={formState.duration === 40}
+                    onPress={() => actions.setDuration(40)}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.inputGroup}>
-            <SectionTitle title="Limpieza Facial" />
-            <View style={styles.row}>
-              <OptionButton
-                label="No"
-                selected={formState.facialType === "no"}
-                onPress={() => actions.setFacialType("no")}
-              />
-              <OptionButton
-                label="Hombre"
-                selected={formState.facialType === "hombre"}
-                onPress={() => actions.setFacialType("hombre")}
-              />
-              <OptionButton
-                label="Mujer"
-                selected={formState.facialType === "mujer"}
-                onPress={() => actions.setFacialType("mujer")}
-              />
-            </View>
-          </View>
+              <View style={styles.inputGroup}>
+                <SectionTitle title="Corte de Uñas" />
+                <View style={styles.row}>
+                  <OptionButton
+                    label="No"
+                    selected={!formState.hasNailCut}
+                    onPress={() => actions.setHasNailCut(false)}
+                  />
+                  <OptionButton
+                    label="Sí (+$5.000)"
+                    selected={formState.hasNailCut}
+                    onPress={() => actions.setHasNailCut(true)}
+                  />
+                </View>
+              </View>
 
-          <View style={[styles.inputGroup, styles.hotelRow]}>
-            <View>
-              <Text style={styles.hotelLabel}>Servicio en Hotel</Text>
-              <Text style={styles.hotelSubLabel}>Aplica comisión 40%</Text>
-            </View>
-            <Switch
-              trackColor={{ false: "#E0E0E0", true: COLORS.primary }}
-              thumbColor={formState.isHotelService ? "#fff" : "#f4f3f4"}
-              onValueChange={actions.setIsHotelService}
-              value={formState.isHotelService}
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <SectionTitle title="Limpieza Facial" />
+                <View style={styles.row}>
+                  <OptionButton
+                    label="No"
+                    selected={formState.facialType === "no"}
+                    onPress={() => actions.setFacialType("no")}
+                  />
+                  <OptionButton
+                    label="Hombre"
+                    selected={formState.facialType === "hombre"}
+                    onPress={() => actions.setFacialType("hombre")}
+                  />
+                  <OptionButton
+                    label="Mujer"
+                    selected={formState.facialType === "mujer"}
+                    onPress={() => actions.setFacialType("mujer")}
+                  />
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* FORMULARIO PARTICULAR (ACTUALIZADO PARA MULTI-SELECCIÓN) */}
+              <View style={styles.inputGroup}>
+                <SectionTitle title="Servicios Particulares (Selección Múltiple)" />
+                <View style={styles.servicesGrid}>
+                  {PARTICULAR_SERVICES.map((service) => {
+                    // CAMBIO: Verificamos si el ID está incluido en el array de seleccionados
+                    const isSelected = formState.selectedServiceIds.includes(
+                      service.id
+                    );
+
+                    return (
+                      <TouchableOpacity
+                        key={service.id}
+                        style={[
+                          styles.serviceChip,
+                          isSelected && styles.serviceChipSelected,
+                        ]}
+                        onPress={() => actions.toggleService(service.id)} // CAMBIO: Usamos toggleService
+                      >
+                        <Text
+                          style={[
+                            styles.serviceText,
+                            isSelected && styles.serviceTextSelected,
+                          ]}
+                        >
+                          {service.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.servicePrice,
+                            isSelected && styles.serviceTextSelected,
+                          ]}
+                        >
+                          ${service.price.toLocaleString("es-CL")} •{" "}
+                          {service.duration}m
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </>
+          )}
         </View>
 
-        {/* RESUMEN */}
+        {/* RESUMEN FINANCIERO */}
         <View style={styles.summaryContainer}>
           <Text style={styles.summaryTitle}>Resumen Financiero</Text>
           <View style={styles.summaryRow}>
@@ -204,7 +274,9 @@ export default function AppointmentScreen({
               ${financialSummary.total.toLocaleString("es-CL")}
             </Text>
           </View>
-          {formState.isHotelService && (
+
+          {/* Desglose solo si es hotel */}
+          {formState.serviceMode === "hotel" && (
             <View style={styles.splitBox}>
               <View style={styles.splitRow}>
                 <Text style={[styles.splitLabel, { color: COLORS.anami }]}>
@@ -281,6 +353,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.secondary,
   },
+
+  // TABS DE MODO
+  modeTabs: {
+    flexDirection: "row",
+    backgroundColor: "#F0F0F0",
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  modeTabActive: {
+    backgroundColor: "#FFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  modeTabText: { fontSize: 14, fontWeight: "500", color: COLORS.textLight },
+  modeTabTextActive: { color: COLORS.primary, fontWeight: "700" },
+
   inputGroup: { marginBottom: 24 },
   label: {
     fontSize: 14,
@@ -300,7 +398,6 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
   },
 
-  // ESTILOS TIME PICKER
   timeScroll: { paddingVertical: 5, gap: 10 },
   timeChip: {
     paddingVertical: 8,
@@ -320,18 +417,33 @@ const styles = StyleSheet.create({
     borderColor: "#EEE",
     opacity: 0.5,
   },
-  timeText: {
-    color: COLORS.textLight,
-    fontWeight: "500",
+  timeText: { color: COLORS.textLight, fontWeight: "500" },
+  timeTextSelected: { color: "#FFF", fontWeight: "700" },
+  timeTextDisabled: { color: "#CCC", textDecorationLine: "line-through" },
+
+  // GRID DE SERVICIOS PARTICULARES
+  servicesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  serviceChip: {
+    width: "48%",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 5,
   },
-  timeTextSelected: {
-    color: "#FFF",
-    fontWeight: "700",
+  serviceChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
-  timeTextDisabled: {
-    color: "#CCC",
-    textDecorationLine: "line-through", // Efecto tachado para indicar ocupado
+  serviceText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textMain,
+    marginBottom: 4,
   },
+  servicePrice: { fontSize: 12, color: COLORS.textLight },
+  serviceTextSelected: { color: "#FFF" },
 
   suggestionsContainer: {
     position: "absolute",

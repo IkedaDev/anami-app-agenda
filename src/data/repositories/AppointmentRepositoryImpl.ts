@@ -58,8 +58,16 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
   }
 
   async create(appointment: Appointment): Promise<Appointment> {
-    await setDoc(doc(db, this.collectionName, appointment.id), appointment);
-    return appointment;
+    try {
+      // Usamos setDoc para especificar el ID que generamos en la app
+      const docRef = doc(db, this.collectionName, appointment.id);
+      await setDoc(docRef, appointment);
+      console.log(`Cita creada exitosamente en nube: ${appointment.id}`);
+      return appointment;
+    } catch (error) {
+      console.error("Error CRÍTICO al guardar en Firebase:", error);
+      throw error; // Re-lanzamos para que el Contexto lo maneje
+    }
   }
 
   async update(appointment: Appointment): Promise<Appointment> {

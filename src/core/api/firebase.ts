@@ -54,8 +54,10 @@ if (!firebaseConfig.apiKey) {
 // Inicializar Firebase App
 const app = initializeApp(firebaseConfig);
 
-// 4. Inicializar Firestore con la corrección para React Native
-// 'experimentalForceLongPolling: true' soluciona el error de timeout/conexión
+// 4. CORRECCIÓN CRÍTICA: Inicializar Firestore con Long Polling
+// Esto soluciona el problema de que la segunda escritura falle.
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
+  // Opcional: Ignorar error de configuración si ya existe
+  ignoreUndefinedProperties: true,
 });

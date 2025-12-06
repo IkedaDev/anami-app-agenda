@@ -23,6 +23,7 @@ export interface IAppointmentRepository {
   update(appointment: Appointment): Promise<Appointment>;
 
   delete(id: string): Promise<void>;
+  getAvailability(date: string, durationMinutes: number): Promise<string[]>;
 }
 
 // Contrato para el Repositorio de Pacientes
@@ -31,4 +32,21 @@ export interface IPatientRepository {
   create(patient: Patient): Promise<Patient>;
   update(patient: Patient): Promise<Patient>;
   delete(id: string): Promise<void>;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  description?: string | null;
+  price: number; // Mapeo de basePrice
+  duration: number; // Mapeo de durationMin
+  isActive: boolean;
+}
+
+// NUEVO: Contrato para el Repositorio de Servicios
+export interface IServiceRepository {
+  /**
+   * Obtiene todos los servicios marcados como activos desde el API.
+   */
+  getAllActive(): Promise<Service[]>;
 }

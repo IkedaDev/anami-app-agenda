@@ -35,8 +35,9 @@ export const PatientProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const data = await repository.getAll();
-      // Ordenamos por fecha de creación, los más nuevos primero
-      setPatients(data.sort((a, b) => b.createdAt - a.createdAt));
+
+      // --- CAMBIO AQUÍ: Ordenar Alfabéticamente (A-Z) ---
+      setPatients(data.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
       console.error(error);
       Alert.alert(
@@ -52,7 +53,11 @@ export const PatientProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const newPatient = await repository.create(patient);
-      setPatients((prev) => [newPatient, ...prev]);
+
+      // Al agregar, reordenamos toda la lista para que el nuevo quede en su posición correcta
+      setPatients((prev) =>
+        [...prev, newPatient].sort((a, b) => a.name.localeCompare(b.name))
+      );
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "No se pudo guardar el cliente en la nube.");
@@ -65,7 +70,13 @@ export const PatientProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const result = await repository.update(updatedPatient);
-      setPatients((prev) => prev.map((p) => (p.id === result.id ? result : p)));
+
+      // Al actualizar, también reordenamos (por si cambiaste el nombre)
+      setPatients((prev) =>
+        prev
+          .map((p) => (p.id === result.id ? result : p))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "No se pudo actualizar la información del cliente.");

@@ -6,19 +6,17 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Switch,
   SafeAreaView,
   StatusBar,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { COLORS } from "../../core/theme/colors";
 import { useAppointmentForm } from "../hooks/useAppointmentForm";
+import { useServices } from "../../core/context/ServiceContext";
 import { OptionButton } from "../components/OptionButton";
 import { SectionTitle } from "../components/SectionTitle";
-import {
-  Appointment,
-  PARTICULAR_SERVICES,
-} from "../../domain/models/appointment";
+import { Appointment } from "../../domain/models/appointment";
 
 interface AppointmentScreenProps {
   appointmentToEdit?: Appointment | null;
@@ -35,8 +33,12 @@ export default function AppointmentScreen({
     isEditing,
     suggestions,
     timeSlots,
+    isSaving,
+    loadingSlots,
     actions,
   } = useAppointmentForm(appointmentToEdit, onSuccess);
+
+  const { services, isLoading: isLoadingServices } = useServices();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,7 +56,7 @@ export default function AppointmentScreen({
         </View>
 
         <View style={styles.card}>
-          {/* SELECTOR DE MODO (TABS) */}
+          {/* SELECTOR DE MODO */}
           <View style={styles.modeTabs}>
             <TouchableOpacity
               style={[
@@ -125,7 +127,15 @@ export default function AppointmentScreen({
 
           {/* TIME PICKER */}
           <View style={styles.inputGroup}>
-            <SectionTitle title="Hora de Inicio" />
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+            >
+              <SectionTitle title="Hora de Inicio" />
+              {loadingSlots && (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              )}
+            </View>
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -160,11 +170,11 @@ export default function AppointmentScreen({
             </ScrollView>
           </View>
 
-          {/* --- FORMULARIO DINÁMICO SEGÚN MODO --- */}
+          {/* --- FORMULARIO DINÁMICO --- */}
 
           {formState.serviceMode === "hotel" ? (
             <>
-              {/* FORMULARIO HOTEL (ANTIGUO) */}
+              {/* Solo Masaje y Uñas, Facial ELIMINADO */}
               <View style={styles.inputGroup}>
                 <SectionTitle title="Masaje Express" />
                 <View style={styles.row}>
@@ -196,70 +206,55 @@ export default function AppointmentScreen({
                   />
                 </View>
               </View>
-
-              <View style={styles.inputGroup}>
-                <SectionTitle title="Limpieza Facial" />
-                <View style={styles.row}>
-                  <OptionButton
-                    label="No"
-                    selected={formState.facialType === "no"}
-                    onPress={() => actions.setFacialType("no")}
-                  />
-                  <OptionButton
-                    label="Hombre"
-                    selected={formState.facialType === "hombre"}
-                    onPress={() => actions.setFacialType("hombre")}
-                  />
-                  <OptionButton
-                    label="Mujer"
-                    selected={formState.facialType === "mujer"}
-                    onPress={() => actions.setFacialType("mujer")}
-                  />
-                </View>
-              </View>
             </>
           ) : (
             <>
-              {/* FORMULARIO PARTICULAR (ACTUALIZADO PARA MULTI-SELECCIÓN) */}
+              {/* FORMULARIO PARTICULAR */}
               <View style={styles.inputGroup}>
                 <SectionTitle title="Servicios Particulares (Selección Múltiple)" />
-                <View style={styles.servicesGrid}>
-                  {PARTICULAR_SERVICES.map((service) => {
-                    // CAMBIO: Verificamos si el ID está incluido en el array de seleccionados
-                    const isSelected = formState.selectedServiceIds.includes(
-                      service.id
-                    );
 
-                    return (
-                      <TouchableOpacity
-                        key={service.id}
-                        style={[
-                          styles.serviceChip,
-                          isSelected && styles.serviceChipSelected,
-                        ]}
-                        onPress={() => actions.toggleService(service.id)} // CAMBIO: Usamos toggleService
-                      >
-                        <Text
+                {isLoadingServices ? (
+                  <View style={{ padding: 20 }}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                  </View>
+                ) : (
+                  <View style={styles.servicesGrid}>
+                    {services.map((service) => {
+                      const isSelected = formState.selectedServiceIds.includes(
+                        service.id
+                      );
+
+                      return (
+                        <TouchableOpacity
+                          key={service.id}
                           style={[
-                            styles.serviceText,
-                            isSelected && styles.serviceTextSelected,
+                            styles.serviceChip,
+                            isSelected && styles.serviceChipSelected,
                           ]}
+                          onPress={() => actions.toggleService(service.id)}
                         >
-                          {service.name}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.servicePrice,
-                            isSelected && styles.serviceTextSelected,
-                          ]}
-                        >
-                          ${service.price.toLocaleString("es-CL")} •{" "}
-                          {service.duration}m
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                          <Text
+                            style={[
+                              styles.serviceText,
+                              isSelected && styles.serviceTextSelected,
+                            ]}
+                          >
+                            {service.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.servicePrice,
+                              isSelected && styles.serviceTextSelected,
+                            ]}
+                          >
+                            ${service.price.toLocaleString("es-CL")} •{" "}
+                            {service.duration}m
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             </>
           )}
@@ -275,7 +270,6 @@ export default function AppointmentScreen({
             </Text>
           </View>
 
-          {/* Desglose solo si es hotel */}
           {formState.serviceMode === "hotel" && (
             <View style={styles.splitBox}>
               <View style={styles.splitRow}>
@@ -300,18 +294,37 @@ export default function AppointmentScreen({
         </View>
 
         <TouchableOpacity
-          style={[styles.saveButton, isEditing && styles.updateButton]}
+          style={[
+            styles.saveButton,
+            isEditing && styles.updateButton,
+            isSaving && { opacity: 0.7 },
+          ]}
           onPress={actions.saveAppointment}
+          disabled={isSaving}
         >
-          <Text style={styles.saveButtonText}>
-            {isEditing ? "Actualizar Cita" : "Registrar Cita"}
-          </Text>
+          {isSaving ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>
+              {isEditing ? "Actualizar Cita" : "Registrar Cita"}
+            </Text>
+          )}
         </TouchableOpacity>
 
-        {isEditing && (
-          <TouchableOpacity style={styles.cancelButton} onPress={onSuccess}>
-            <Text style={styles.cancelButtonText}>Cancelar Edición</Text>
-          </TouchableOpacity>
+        {isEditing && !isSaving && (
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={actions.handleDelete}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.deleteButtonText}>Cancelar Cita</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelButton} onPress={onSuccess}>
+              <Text style={styles.cancelButtonText}>Volver sin guardar</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -319,6 +332,7 @@ export default function AppointmentScreen({
 }
 
 const styles = StyleSheet.create({
+  // ... (Mismos estilos que antes) ...
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -353,8 +367,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.secondary,
   },
-
-  // TABS DE MODO
   modeTabs: {
     flexDirection: "row",
     backgroundColor: "#F0F0F0",
@@ -378,7 +390,6 @@ const styles = StyleSheet.create({
   },
   modeTabText: { fontSize: 14, fontWeight: "500", color: COLORS.textLight },
   modeTabTextActive: { color: COLORS.primary, fontWeight: "700" },
-
   inputGroup: { marginBottom: 24 },
   label: {
     fontSize: 14,
@@ -397,7 +408,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textMain,
   },
-
   timeScroll: { paddingVertical: 5, gap: 10 },
   timeChip: {
     paddingVertical: 8,
@@ -420,8 +430,6 @@ const styles = StyleSheet.create({
   timeText: { color: COLORS.textLight, fontWeight: "500" },
   timeTextSelected: { color: "#FFF", fontWeight: "700" },
   timeTextDisabled: { color: "#CCC", textDecorationLine: "line-through" },
-
-  // GRID DE SERVICIOS PARTICULARES
   servicesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   serviceChip: {
     width: "48%",
@@ -444,7 +452,6 @@ const styles = StyleSheet.create({
   },
   servicePrice: { fontSize: 12, color: COLORS.textLight },
   serviceTextSelected: { color: "#FFF" },
-
   suggestionsContainer: {
     position: "absolute",
     top: "100%",
@@ -470,18 +477,6 @@ const styles = StyleSheet.create({
   suggestionText: { fontSize: 16, color: COLORS.textMain },
   suggestionSubText: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
   row: { flexDirection: "row", gap: 10 },
-  hotelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    padding: 16,
-    borderRadius: 16,
-    marginTop: 8,
-    marginBottom: 0,
-  },
-  hotelLabel: { fontSize: 16, fontWeight: "600", color: COLORS.hotel },
-  hotelSubLabel: { fontSize: 12, color: COLORS.textLight },
   summaryContainer: { marginBottom: 30 },
   summaryTitle: {
     fontSize: 18,
@@ -530,6 +525,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 1,
   },
-  cancelButton: { marginTop: 15, alignItems: "center", padding: 10 },
+  actionsContainer: {
+    marginTop: 20,
+    gap: 15,
+  },
+  deleteButton: {
+    backgroundColor: "#FFF",
+    paddingVertical: 16,
+    borderRadius: 50,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#FF6B6B",
+    marginBottom: 5,
+  },
+  deleteButtonText: {
+    color: "#FF6B6B",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cancelButton: { marginTop: 5, alignItems: "center", padding: 10 },
   cancelButtonText: { color: COLORS.textLight, fontSize: 16 },
 });

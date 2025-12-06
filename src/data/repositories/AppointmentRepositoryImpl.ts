@@ -1,85 +1,117 @@
-import {
-  collection,
-  getDocs,
-  setDoc,
-  doc,
-  deleteDoc,
-  updateDoc,
-  query,
-  orderBy,
-  limit,
-  startAfter,
-} from "firebase/firestore";
-import { db } from "../../core/api/firebase";
+import { httpClient } from "../../core/api/http";
 import { Appointment } from "../../domain/models/appointment";
 import { IAppointmentRepository } from "../../domain/repositories";
 
 export class AppointmentRepositoryImpl implements IAppointmentRepository {
-  private collectionName = "appointments";
+  async getAvailability(
+    date: string,
+    durationMinutes: number
+  ): Promise<string[]> {
+    try {
+      const response = await httpClient.get<{
+        success: boolean;
+        data: { date: string; availableSlots: string[] };
+      }>(
+        `/appointments/availability?date=${date}&durationMinutes=${durationMinutes}`
+      );
+
+      return response.data.availableSlots;
+    } catch (error) {
+      console.error("Error fetching availability:", error);
+      return [];
+    }
+  }
 
   async getPaginated(
     limitCount: number,
-    lastVisible: any = null
+    pageCursor: any = 1
   ): Promise<{ appointments: Appointment[]; lastDoc: any }> {
-    try {
-      let q = query(
-        collection(db, this.collectionName),
-        orderBy("createdAt", "desc"), // Ordenamos por fecha de creación descendente
-        limit(limitCount)
-      );
+    const page = typeof pageCursor === "number" ? pageCursor : 1;
+    const response = await httpClient.get<any>(
+      `/appointments?page=${page}&limit=${limitCount}`
+    );
 
-      // Si hay un cursor, empezamos después de él
-      if (lastVisible) {
-        q = query(q, startAfter(lastVisible));
-      }
+    const backendApps = response.data;
 
-      const querySnapshot = await getDocs(q);
-      const appointments: Appointment[] = [];
+    const appointments: Appointment[] = backendApps.map((appt: any) => {
+      const isHotel = appt.locationType === "HOTEL";
+      const serviceIds = appt.items?.map((i: any) => i.serviceId) || [];
 
-      querySnapshot.forEach((doc) => {
-        appointments.push(doc.data() as Appointment);
-      });
+      return {
+        id: appt.id,
+        date: new Date(appt.startsAt).toLocaleDateString("es-CL", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        }),
+        patientName: appt.client.fullName,
+        patientId: appt.clientId,
+        serviceMode: isHotel ? "hotel" : "particular",
+        duration: appt.durationMinutes,
 
-      // Retornamos los datos y el último documento (cursor para la próxima llamada)
-      const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+        hasNailCut: appt.hasNailCut,
+        // facialType ya no lo mapeamos porque ya no existe en el frontend
 
-      return { appointments, lastDoc };
-    } catch (error) {
-      console.error("Error getting paginated documents: ", error);
-      throw error;
-    }
-  }
+        selectedServiceIds: serviceIds,
+        selectedTime: new Date(appt.startsAt).toLocaleTimeString("es-CL", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
 
-  // Mantenemos los otros métodos igual (create, update, delete)
-  async getAll(): Promise<Appointment[]> {
-    // Método legacy o para casos donde necesites todo
-    const result = await this.getPaginated(1000);
-    return result.appointments;
+        total: appt.totalPrice,
+        anamiShare: appt.anamiShare,
+        hotelShare: appt.hotelShare,
+
+        createdAt: new Date(appt.createdAt || appt.startsAt).getTime(),
+        scheduledStart: new Date(appt.startsAt).getTime(),
+        scheduledEnd: new Date(appt.endsAt).getTime(),
+      };
+    });
+
+    const meta = response.meta;
+    const nextPage = meta.hasNextPage ? meta.page + 1 : null;
+
+    return { appointments, lastDoc: nextPage };
   }
 
   async create(appointment: Appointment): Promise<Appointment> {
-    try {
-      // Usamos setDoc para especificar el ID que generamos en la app
-      const docRef = doc(db, this.collectionName, appointment.id);
-      await setDoc(docRef, appointment);
-      console.log(`Cita creada exitosamente en nube: ${appointment.id}`);
-      return appointment;
-    } catch (error) {
-      console.error("Error CRÍTICO al guardar en Firebase:", error);
-      throw error; // Re-lanzamos para que el Contexto lo maneje
-    }
+    const payload = {
+      clientId: appointment.patientId,
+      serviceIds: appointment.selectedServiceIds,
+      startsAt: new Date(appointment.scheduledStart).toISOString(),
+      locationType:
+        appointment.serviceMode === "hotel" ? "HOTEL" : "PARTICULAR",
+
+      durationMinutes: appointment.duration,
+      hasNailCut: appointment.hasNailCut,
+      // facialType eliminado
+    };
+
+    const res = await httpClient.post<any>("/appointments", payload);
+    return { ...appointment, id: res.data.id };
   }
 
   async update(appointment: Appointment): Promise<Appointment> {
-    const appointmentRef = doc(db, this.collectionName, appointment.id);
-    const { id, ...dataToUpdate } = appointment;
+    const payload = {
+      serviceIds: appointment.selectedServiceIds,
+      startsAt: new Date(appointment.scheduledStart).toISOString(),
+      locationType:
+        appointment.serviceMode === "hotel" ? "HOTEL" : "PARTICULAR",
 
-    // @ts-ignore
-    await updateDoc(appointmentRef, dataToUpdate);
+      durationMinutes: appointment.duration,
+      hasNailCut: appointment.hasNailCut,
+      // facialType eliminado
+    };
+
+    await httpClient.patch(`/appointments/${appointment.id}`, payload);
     return appointment;
   }
 
   async delete(id: string): Promise<void> {
-    await deleteDoc(doc(db, this.collectionName, id));
+    await httpClient.delete(`/appointments/${id}`);
+  }
+
+  async getAll(): Promise<Appointment[]> {
+    return [];
   }
 }

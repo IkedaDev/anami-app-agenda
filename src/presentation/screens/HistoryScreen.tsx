@@ -12,11 +12,9 @@ import {
   RefreshControl,
 } from "react-native";
 import { useAppointments } from "../../core/context/AppointmentContext";
+import { useServices } from "../../core/context/ServiceContext"; // <--- 1. IMPORTAR CONTEXTO
 import { COLORS } from "../../core/theme/colors";
-import {
-  Appointment,
-  PARTICULAR_SERVICES,
-} from "../../domain/models/appointment";
+import { Appointment } from "../../domain/models/appointment";
 
 interface HistoryScreenProps {
   onEdit: (appointment: Appointment) => void;
@@ -30,6 +28,9 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     refreshAppointments,
     isLoading,
   } = useAppointments();
+
+  // 2. OBTENER SERVICIOS DEL BACKEND
+  const { services } = useServices();
 
   const [viewMode, setViewMode] = useState<"today" | "month" | "all">("today");
 
@@ -52,7 +53,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     );
   };
 
-  // 1. FILTRADO DE DATOS (Cliente)
+  // 3. FILTRADO DE DATOS
   const filteredAppointments = useMemo(() => {
     if (viewMode === "all") {
       return appointments;
@@ -63,11 +64,13 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     return appointments.filter((appt) => isToday(appt.createdAt));
   }, [appointments, viewMode]);
 
-  // 2. CÁLCULOS DE RESUMEN
+  // 4. CÁLCULOS DE RESUMEN
   const stats = useMemo(() => {
+    // Filtramos usando serviceMode (más seguro que isHotelService)
     const hotelAppointments = filteredAppointments.filter(
-      (appt) => appt.isHotelService
+      (appt) => appt.serviceMode === "hotel"
     );
+
     const hotelStats = hotelAppointments.reduce(
       (acc, curr) => ({
         total: acc.total + curr.total,
@@ -87,31 +90,18 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
 
   const renderItem = ({ item }: { item: Appointment }) => {
     const editable = isToday(item.createdAt);
-
-    // Determinamos el modo de forma segura
-    const isHotel =
-      item.serviceMode === "hotel" ||
-      (item.isHotelService && item.serviceMode !== "particular");
+    const isHotel = item.serviceMode === "hotel";
 
     const getParticularDetails = () => {
-      // AQUI ESTA EL CAMBIO IMPORTANTE:
-      // Usamos 'selectedServiceIds' (array) preferentemente.
-      // Mantenemos compatibilidad con 'selectedServiceId' (singular) por si hubiera datos viejos.
-      // Nota: TypeScript podría quejarse si 'selectedServiceId' ya no existe en la interfaz Appointment,
-      // así que usamos un cast a 'any' solo para acceder a la propiedad legacy de forma segura si fuera necesario,
-      // o confiamos en que la interfaz ya se actualizó.
-
-      const ids =
-        item.selectedServiceIds ||
-        ((item as any).selectedServiceId
-          ? [(item as any).selectedServiceId]
-          : []);
+      // Recuperamos los IDs guardados
+      const ids = item.selectedServiceIds || [];
 
       if (ids.length === 0) return "Servicio sin especificar";
 
+      // 5. MAPEO DINÁMICO (Usando 'services' del backend)
       return ids
         .map((id) => {
-          const service = PARTICULAR_SERVICES.find((s) => s.id === id);
+          const service = services.find((s) => s.id === id);
           return service ? service.name : "Servicio desconocido";
         })
         .join(" + ");
@@ -143,11 +133,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
             <>
               <Text style={styles.detailText}>Masaje {item.duration} min</Text>
               {item.hasNailCut && <Text style={styles.detailText}>• Uñas</Text>}
-              {item.facialType !== "no" && (
-                <Text style={styles.detailText}>
-                  • Facial {item.facialType}
-                </Text>
-              )}
+              {/* 6. LIMPIEZA: Eliminado FacialType porque ya no existe en el modelo */}
             </>
           ) : (
             <Text style={styles.detailText}>{getParticularDetails()}</Text>
@@ -181,56 +167,25 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
   const ListHeader = () => (
     <View>
       <View style={styles.filterContainer}>
-        <TouchableOpacity
-          style={[
-            styles.filterBtn,
-            viewMode === "today" && styles.filterBtnActive,
-          ]}
-          onPress={() => setViewMode("today")}
-        >
-          <Text
+        {(["today", "month", "all"] as const).map((mode) => (
+          <TouchableOpacity
+            key={mode}
             style={[
-              styles.filterText,
-              viewMode === "today" && styles.filterTextActive,
+              styles.filterBtn,
+              viewMode === mode && styles.filterBtnActive,
             ]}
+            onPress={() => setViewMode(mode)}
           >
-            Hoy
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterBtn,
-            viewMode === "month" && styles.filterBtnActive,
-          ]}
-          onPress={() => setViewMode("month")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              viewMode === "month" && styles.filterTextActive,
-            ]}
-          >
-            Mes
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filterBtn,
-            viewMode === "all" && styles.filterBtnActive,
-          ]}
-          onPress={() => setViewMode("all")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              viewMode === "all" && styles.filterTextActive,
-            ]}
-          >
-            Todo
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.filterText,
+                viewMode === mode && styles.filterTextActive,
+              ]}
+            >
+              {mode === "today" ? "Hoy" : mode === "month" ? "Mes" : "Todo"}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.summaryCard}>

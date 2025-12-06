@@ -11,29 +11,29 @@ import { Alert } from "react-native";
 
 interface AppointmentContextType {
   appointments: Appointment[];
-  isLoading: boolean; // Carga inicial
-  isLoadingMore: boolean; // Carga de paginación
-  hasMore: boolean; // Si quedan más datos por cargar
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
   addAppointment: (appointment: Appointment) => Promise<void>;
   updateAppointment: (appointment: Appointment) => Promise<void>;
-  refreshAppointments: () => Promise<void>; // Recargar desde cero
-  loadMoreAppointments: () => Promise<void>; // Cargar siguiente página
+  refreshAppointments: () => Promise<void>;
+  loadMoreAppointments: () => Promise<void>;
+  cancelAppointment: (id: string) => Promise<void>;
 }
 
 const AppointmentContext = createContext<AppointmentContextType | undefined>(
   undefined
 );
 const repository = new AppointmentRepositoryImpl();
-const PAGE_SIZE = 15; // Cantidad de items por página
+const PAGE_SIZE = 15;
 
 export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [lastDoc, setLastDoc] = useState<any>(null); // Cursor de Firestore
+  const [lastDoc, setLastDoc] = useState<any>(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // Carga inicial al montar
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -45,7 +45,7 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
         await repository.getPaginated(PAGE_SIZE);
       setAppointments(newApps);
       setLastDoc(newLastDoc);
-      setHasMore(newApps.length === PAGE_SIZE); // Si trajimos menos que el límite, no hay más
+      setHasMore(newApps.length === PAGE_SIZE);
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "No se pudieron cargar las citas");
@@ -55,7 +55,6 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const refreshAppointments = async () => {
-    // Reinicia la lista y carga la primera página
     setHasMore(true);
     await loadInitialData();
   };
@@ -69,7 +68,7 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
         await repository.getPaginated(PAGE_SIZE, lastDoc);
 
       if (newApps.length > 0) {
-        setAppointments((prev) => [...prev, ...newApps]); // Concatenamos
+        setAppointments((prev) => [...prev, ...newApps]);
         setLastDoc(newLastDoc);
         if (newApps.length < PAGE_SIZE) setHasMore(false);
       } else {
@@ -83,17 +82,29 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addAppointment = async (appointment: Appointment) => {
-    // Optimistic update: Agregamos visualmente primero
+    // 1. Optimistic Update: La mostramos inmediatamente con el ID temporal
     setAppointments((prev) => [appointment, ...prev]);
+
     try {
-      await repository.create(appointment);
+      // 2. Enviamos al backend y ESPERAMOS la respuesta (que trae el ID real)
+      const savedAppointment = await repository.create(appointment);
+
+      // 3. Reemplazamos silenciosamente la cita temporal por la real
+      setAppointments((prev) =>
+        prev.map((appt) =>
+          appt.id === appointment.id ? savedAppointment : appt
+        )
+      );
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "No se pudo guardar en la nube, pero está local.");
+      // Si falla, quitamos la cita de la lista (Rollback)
+      setAppointments((prev) => prev.filter((a) => a.id !== appointment.id));
+      Alert.alert("Error", "No se pudo guardar la cita en el servidor.");
     }
   };
 
   const updateAppointment = async (updatedAppointment: Appointment) => {
+    // Optimistic Update
     setAppointments((prev) =>
       prev.map((appt) =>
         appt.id === updatedAppointment.id ? updatedAppointment : appt
@@ -103,9 +114,26 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
       await repository.update(updatedAppointment);
     } catch (error) {
       console.error(error);
+      Alert.alert("Error", "No se pudo actualizar la cita.");
+      // Aquí podrías recargar la lista para deshacer el cambio visual
+      refreshAppointments();
     }
   };
+  const cancelAppointment = async (id: string) => {
+    // 1. Optimistic Update: La quitamos de la lista inmediatamente
+    const previousList = [...appointments];
+    setAppointments((prev) => prev.filter((a) => a.id !== id));
 
+    try {
+      // 2. Llamada al Backend (DELETE)
+      await repository.delete(id);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "No se pudo cancelar la cita en el sistema.");
+      // Rollback si falla
+      setAppointments(previousList);
+    }
+  };
   return (
     <AppointmentContext.Provider
       value={{
@@ -115,6 +143,7 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
         hasMore,
         addAppointment,
         updateAppointment,
+        cancelAppointment,
         refreshAppointments,
         loadMoreAppointments,
       }}

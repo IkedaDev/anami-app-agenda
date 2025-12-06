@@ -26,6 +26,7 @@ const generateUUID = () => {
 const patientRepo = new PatientRepositoryImpl();
 const appointmentRepo = new AppointmentRepositoryImpl();
 
+// Generamos todos los slots del día (08:00 a 23:00)
 const generateAllDailySlots = () => {
   const slots = [];
   for (let h = 8; h < 23; h++) {
@@ -38,8 +39,13 @@ const generateAllDailySlots = () => {
   return slots;
 };
 
-const getTimestampForTime = (dateStr: string, timeStr: string): number => {
-  return new Date(`${dateStr}T${timeStr}:00`).getTime();
+// 1. CORRECCIÓN: Ahora recibe la fecha base como argumento
+const getTimestampForTime = (baseDate: Date, timeStr: string): number => {
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  // Clonamos la fecha base para no mutarla
+  const date = new Date(baseDate);
+  date.setHours(hours, minutes, 0, 0);
+  return date.getTime();
 };
 
 export const useAppointmentForm = (
@@ -51,13 +57,13 @@ export const useAppointmentForm = (
   const { patients } = usePatients();
   const { services } = useServices();
 
+  // 2. LÓGICA DE FECHA BASE (Crucial para editar)
+  // Si editamos, la base es la fecha de la cita. Si es nueva, es Hoy.
   const baseDate = useMemo(() => {
     if (appointmentToEdit) {
-      return new Date(appointmentToEdit.scheduledStart)
-        .toISOString()
-        .split("T")[0];
+      return new Date(appointmentToEdit.scheduledStart);
     }
-    return new Date().toISOString().split("T")[0];
+    return new Date();
   }, [appointmentToEdit]);
 
   const [formState, setFormState] = useState<
@@ -69,7 +75,6 @@ export const useAppointmentForm = (
     serviceMode: "hotel",
     duration: null as any,
     hasNailCut: false,
-    // facialType eliminado
     selectedServiceIds: [],
     selectedTime: "",
   });
@@ -88,6 +93,7 @@ export const useAppointmentForm = (
       let total = 0;
       if (formState.duration) total += formState.duration;
       if (formState.hasNailCut) total += 10;
+      // facialType eliminado
       return total || 10;
     } else {
       let total = 0;
@@ -99,14 +105,19 @@ export const useAppointmentForm = (
     }
   }, [formState, services]);
 
-  // --- CONSULTAR DISPONIBILIDAD ---
+  // --- CONSULTAR DISPONIBILIDAD AL BACKEND ---
   useEffect(() => {
     let isActive = true;
+
+    // Convertimos baseDate a string YYYY-MM-DD para la API
+    // Usamos toLocaleDateString con 'en-CA' (formato ISO local) para evitar desfase de zona horaria
+    const dateStr = baseDate.toLocaleDateString("en-CA");
+
     const fetchAvailability = async () => {
       setLoadingSlots(true);
       try {
         const slots = await appointmentRepo.getAvailability(
-          baseDate,
+          dateStr,
           currentDuration
         );
         if (isActive) setAvailableSlotsFromApi(slots);
@@ -116,6 +127,7 @@ export const useAppointmentForm = (
         if (isActive) setLoadingSlots(false);
       }
     };
+
     const timeout = setTimeout(fetchAvailability, 300);
     return () => {
       isActive = false;
@@ -127,14 +139,16 @@ export const useAppointmentForm = (
   const timeSlots = useMemo(() => {
     const allSlots = generateAllDailySlots();
     const now = new Date();
-    const todayStr = now.toLocaleDateString("en-CA");
-    const isToday = baseDate === todayStr;
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
     const mappedSlots = allSlots.map((time) => {
-      const [h, m] = time.split(":").map(Number);
-      const slotMinutes = h * 60 + m;
-      const isPast = isToday && slotMinutes < currentMinutes;
+      // 3. Usamos la fecha base correcta para calcular el timestamp exacto de este slot
+      const slotStart = getTimestampForTime(baseDate, time);
+
+      // 4. Lógica de "Ya pasó": Comparamos el timestamp del slot con AHORA mismo
+      // Esto funciona perfecto: si editas una cita de mañana, slotStart será futuro -> isPast=false.
+      // Si editas una de hoy a las 8AM (y son las 2PM), slotStart será pasado -> isPast=true.
+      const isPast = slotStart < now.getTime();
+
       const isAvailableInBackend = availableSlotsFromApi.includes(time);
       const isMyOriginalTime = appointmentToEdit?.selectedTime === time;
 
@@ -145,6 +159,7 @@ export const useAppointmentForm = (
       };
     });
 
+    // Filtramos visualmente lo pasado y cortamos desde el primero disponible
     const futureSlots = mappedSlots.filter((slot) => !slot.isPast);
     const firstAvailableIndex = futureSlots.findIndex((slot) => slot.available);
 
@@ -152,7 +167,7 @@ export const useAppointmentForm = (
     return futureSlots.slice(firstAvailableIndex);
   }, [availableSlotsFromApi, baseDate, appointmentToEdit]);
 
-  // --- AUTO-SELECCIÓN DE HORA ---
+  // --- AUTO-SELECCIÓN ---
   useEffect(() => {
     if (timeSlots.length > 0) {
       const firstSlot = timeSlots[0];
@@ -192,11 +207,13 @@ export const useAppointmentForm = (
         serviceMode: mode,
         duration: appointmentToEdit.duration,
         hasNailCut: appointmentToEdit.hasNailCut,
+        // facialType eliminado
         selectedServiceIds: serviceIds,
         selectedTime: appointmentToEdit.selectedTime || "",
       });
     } else {
-      const dateObj = new Date(baseDate + "T12:00:00");
+      const dateObj = new Date(baseDate);
+      // Formato visual de fecha
       const formattedDate = dateObj.toLocaleDateString("es-CL", {
         weekday: "long",
         year: "numeric",
@@ -216,25 +233,19 @@ export const useAppointmentForm = (
     }
   }, [appointmentToEdit, baseDate]);
 
-  // --- CÁLCULO FINANCIERO ---
+  // --- CÁLCULO FINANCIERO (CON LA REGLA DE UÑAS 100%) ---
   const financialSummary: FinancialSummary = useMemo(() => {
     let currentTotal = 0;
     let massagePrice = 0;
     let nailsPrice = 0;
 
     if (formState.serviceMode === "hotel") {
-      // 1. Calcular precio BASE del masaje (Sujeto a comisión)
       if (formState.duration) {
         massagePrice = HOTEL_PRICES.massage[formState.duration as 20 | 40] || 0;
       }
-
-      // 2. Calcular precio EXTRA de uñas (100% Anami)
       nailsPrice = formState.hasNailCut ? HOTEL_PRICES.nails.yes : 0;
-
-      // El total que paga el cliente es la suma de ambos
       currentTotal = massagePrice + nailsPrice;
     } else {
-      // Modo Particular: Suma simple de servicios seleccionados (sin comisión hotel)
       formState.selectedServiceIds.forEach((id) => {
         const service = services.find((s) => s.id === id);
         if (service) currentTotal += service.price;
@@ -245,16 +256,10 @@ export const useAppointmentForm = (
     let hotel = 0;
 
     if (formState.serviceMode === "hotel") {
-      // --- REGLA DE NEGOCIO ---
-      // El hotel gana el 40% SOLO del precio del masaje.
       const hotelFromMassage = Math.round(massagePrice * 0.4);
-
       hotel = hotelFromMassage;
-
-      // Anami gana: (El resto del masaje) + (El 100% de las uñas)
       anami = massagePrice - hotelFromMassage + nailsPrice;
     } else {
-      // En particular, todo es para Anami
       anami = currentTotal;
       hotel = 0;
     }
@@ -309,6 +314,9 @@ export const useAppointmentForm = (
   const setSelectedTime = (time: string) =>
     setFormState((prev) => ({ ...prev, selectedTime: time }));
 
+  // Stubs para compatibilidad si la UI los llama
+  const setIsHotelService = (val: boolean) => {};
+
   const saveAppointment = async () => {
     if (isSaving) return;
 
@@ -325,7 +333,6 @@ export const useAppointmentForm = (
     }
 
     if (formState.serviceMode === "hotel") {
-      // Validamos que haya al menos duración o uñas (ya no facial)
       const hasService = formState.duration || formState.hasNailCut;
       if (!hasService) {
         Alert.alert("Sin servicios", "Debes seleccionar al menos un servicio.");
@@ -360,6 +367,7 @@ export const useAppointmentForm = (
         finalPatientId = newPatient.id;
       }
 
+      // 5. GUARDAR USANDO LA FECHA CORRECTA
       const startTimestamp = getTimestampForTime(
         baseDate,
         formState.selectedTime
@@ -404,6 +412,7 @@ export const useAppointmentForm = (
 
   const handleDelete = () => {
     if (!appointmentToEdit) return;
+
     Alert.alert(
       "Cancelar Cita",
       "¿Estás segura de que quieres eliminar esta cita? El horario quedará libre.",
@@ -455,6 +464,7 @@ export const useAppointmentForm = (
       setDuration,
       setHasNailCut,
       setSelectedTime,
+      setIsHotelService,
       saveAppointment,
       handleDelete,
     },

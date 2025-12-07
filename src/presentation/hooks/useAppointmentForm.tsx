@@ -48,6 +48,47 @@ const getTimestampForTime = (baseDate: Date, timeStr: string): number => {
   return date.getTime();
 };
 
+// 2. NUEVOS HELPERS PARA FORMATEO MANUAL (Evita el bug de UTC en Android)
+const toLocalISOString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`; // Retorna "2025-12-06" respetando hora local
+};
+
+const toSpanishDateString = (date: Date) => {
+  const days = [
+    "Domingo",
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+  ];
+  const months = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+  ];
+
+  const dayName = days[date.getDay()];
+  const dayNumber = date.getDate();
+  const monthName = months[date.getMonth()];
+  // const year = date.getFullYear(); // Opcional
+
+  return `${dayName} ${dayNumber} de ${monthName}`;
+};
+
 export const useAppointmentForm = (
   appointmentToEdit?: Appointment | null,
   onSuccess?: () => void
@@ -57,7 +98,7 @@ export const useAppointmentForm = (
   const { patients } = usePatients();
   const { services } = useServices();
 
-  // 2. LÓGICA DE FECHA BASE (Crucial para editar)
+  // 3. LÓGICA DE FECHA BASE (Crucial para editar)
   // Si editamos, la base es la fecha de la cita. Si es nueva, es Hoy.
   const baseDate = useMemo(() => {
     if (appointmentToEdit) {
@@ -93,7 +134,6 @@ export const useAppointmentForm = (
       let total = 0;
       if (formState.duration) total += formState.duration;
       if (formState.hasNailCut) total += 10;
-      // facialType eliminado
       return total || 10;
     } else {
       let total = 0;
@@ -109,9 +149,8 @@ export const useAppointmentForm = (
   useEffect(() => {
     let isActive = true;
 
-    // Convertimos baseDate a string YYYY-MM-DD para la API
-    // Usamos toLocaleDateString con 'en-CA' (formato ISO local) para evitar desfase de zona horaria
-    const dateStr = baseDate.toLocaleDateString("en-CA");
+    // 4. USO DEL HELPER MANUAL (Reemplaza a toLocaleDateString)
+    const dateStr = toLocalISOString(baseDate);
 
     const fetchAvailability = async () => {
       setLoadingSlots(true);
@@ -141,12 +180,10 @@ export const useAppointmentForm = (
     const now = new Date();
 
     const mappedSlots = allSlots.map((time) => {
-      // 3. Usamos la fecha base correcta para calcular el timestamp exacto de este slot
+      // 5. Usamos la fecha base correcta para calcular el timestamp exacto de este slot
       const slotStart = getTimestampForTime(baseDate, time);
 
-      // 4. Lógica de "Ya pasó": Comparamos el timestamp del slot con AHORA mismo
-      // Esto funciona perfecto: si editas una cita de mañana, slotStart será futuro -> isPast=false.
-      // Si editas una de hoy a las 8AM (y son las 2PM), slotStart será pasado -> isPast=true.
+      // 6. Lógica de "Ya pasó": Comparamos el timestamp del slot con AHORA mismo
       const isPast = slotStart < now.getTime();
 
       const isAvailableInBackend = availableSlotsFromApi.includes(time);
@@ -207,25 +244,17 @@ export const useAppointmentForm = (
         serviceMode: mode,
         duration: appointmentToEdit.duration,
         hasNailCut: appointmentToEdit.hasNailCut,
-        // facialType eliminado
         selectedServiceIds: serviceIds,
         selectedTime: appointmentToEdit.selectedTime || "",
       });
     } else {
+      // 7. USO DEL HELPER MANUAL PARA EL TÍTULO
       const dateObj = new Date(baseDate);
-      // Formato visual de fecha
-      const formattedDate = dateObj.toLocaleDateString("es-CL", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-      const capitalizedDate =
-        formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+      const formattedDate = toSpanishDateString(dateObj);
 
       setFormState((prev) => ({
         ...prev,
-        date: capitalizedDate,
+        date: formattedDate,
         patientName: "",
         duration: null as any,
         selectedTime: "",
@@ -233,7 +262,7 @@ export const useAppointmentForm = (
     }
   }, [appointmentToEdit, baseDate]);
 
-  // --- CÁLCULO FINANCIERO (CON LA REGLA DE UÑAS 100%) ---
+  // --- CÁLCULO FINANCIERO (UÑAS 100% PARA ANAMI) ---
   const financialSummary: FinancialSummary = useMemo(() => {
     let currentTotal = 0;
     let massagePrice = 0;
@@ -275,6 +304,7 @@ export const useAppointmentForm = (
       duration: null as any,
       selectedServiceIds: [],
       hasNailCut: false,
+      facialType: "no",
       selectedTime: "",
     }));
   };
@@ -314,7 +344,7 @@ export const useAppointmentForm = (
   const setSelectedTime = (time: string) =>
     setFormState((prev) => ({ ...prev, selectedTime: time }));
 
-  // Stubs para compatibilidad si la UI los llama
+  // Stubs para compatibilidad de interfaz
   const setIsHotelService = (val: boolean) => {};
 
   const saveAppointment = async () => {
@@ -349,7 +379,7 @@ export const useAppointmentForm = (
     if (slotData && !slotData.available) {
       Alert.alert(
         "Horario no disponible",
-        "El horario seleccionado ya no está disponible."
+        "El horario seleccionado choca con otra cita o ya pasó."
       );
       return;
     }
@@ -367,7 +397,7 @@ export const useAppointmentForm = (
         finalPatientId = newPatient.id;
       }
 
-      // 5. GUARDAR USANDO LA FECHA CORRECTA
+      // 8. GUARDAR USANDO LA FECHA BASE CORRECTA
       const startTimestamp = getTimestampForTime(
         baseDate,
         formState.selectedTime
@@ -434,14 +464,20 @@ export const useAppointmentForm = (
 
   const resetForm = () => {
     if (!appointmentToEdit) {
+      // Al resetear, volvemos a HOY
+      const now = new Date();
+      const formattedDate = toSpanishDateString(now);
+
       setFormState((prev) => ({
         ...prev,
+        date: formattedDate,
         patientName: "",
         patientId: undefined,
         duration: null as any,
         selectedServiceId: undefined,
         selectedServiceIds: [],
         hasNailCut: false,
+        facialType: "no",
         selectedTime: "",
       }));
       setShowSuggestions(false);

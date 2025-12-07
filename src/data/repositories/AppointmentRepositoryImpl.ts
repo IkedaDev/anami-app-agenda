@@ -6,10 +6,9 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
   async getAvailability(
     date: string,
     durationMinutes: number,
-    excludeId?: string // 👈 Nuevo parámetro
+    excludeId?: string
   ): Promise<string[]> {
     try {
-      // Construimos la URL con el parámetro extra si existe
       let url = `/appointments/availability?date=${date}&durationMinutes=${durationMinutes}`;
       if (excludeId) {
         url += `&excludeId=${excludeId}`;

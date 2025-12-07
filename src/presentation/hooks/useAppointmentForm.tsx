@@ -149,16 +149,19 @@ export const useAppointmentForm = (
   useEffect(() => {
     let isActive = true;
 
-    // 4. USO DEL HELPER MANUAL (Reemplaza a toLocaleDateString)
     const dateStr = toLocalISOString(baseDate);
 
     const fetchAvailability = async () => {
       setLoadingSlots(true);
       try {
+        const excludeId = appointmentToEdit?.id;
+
         const slots = await appointmentRepo.getAvailability(
           dateStr,
-          currentDuration
+          currentDuration,
+          excludeId // <--- Enviamos el ID para que el backend lo ignore
         );
+
         if (isActive) setAvailableSlotsFromApi(slots);
       } catch (error) {
         console.error("Error fetching slots:", error);

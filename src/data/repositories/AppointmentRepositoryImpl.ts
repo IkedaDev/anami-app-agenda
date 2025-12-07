@@ -5,15 +5,20 @@ import { IAppointmentRepository } from "../../domain/repositories";
 export class AppointmentRepositoryImpl implements IAppointmentRepository {
   async getAvailability(
     date: string,
-    durationMinutes: number
+    durationMinutes: number,
+    excludeId?: string // 👈 Nuevo parámetro
   ): Promise<string[]> {
     try {
+      // Construimos la URL con el parámetro extra si existe
+      let url = `/appointments/availability?date=${date}&durationMinutes=${durationMinutes}`;
+      if (excludeId) {
+        url += `&excludeId=${excludeId}`;
+      }
+
       const response = await httpClient.get<{
         success: boolean;
         data: { date: string; availableSlots: string[] };
-      }>(
-        `/appointments/availability?date=${date}&durationMinutes=${durationMinutes}`
-      );
+      }>(url);
 
       return response.data.availableSlots;
     } catch (error) {

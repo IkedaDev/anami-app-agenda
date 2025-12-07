@@ -23,7 +23,11 @@ export interface IAppointmentRepository {
   update(appointment: Appointment): Promise<Appointment>;
 
   delete(id: string): Promise<void>;
-  getAvailability(date: string, durationMinutes: number): Promise<string[]>;
+  getAvailability(
+    date: string,
+    durationMinutes: number,
+    excludeId?: string
+  ): Promise<string[]>;
 }
 
 // Contrato para el Repositorio de Pacientes

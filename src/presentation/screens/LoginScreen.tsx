@@ -15,11 +15,16 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context"; // <--- 1. IMPORTAR ESTO
 import { COLORS } from "../../core/theme/colors";
 import { useAuth } from "../../core/context/AuthContext";
+import { API_CONFIG } from "../../core/api/http";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { login, isLoading } = useAuth();
+
+  //   React.useEffect(() => {
+  //     Alert.alert("Debug URL", `Conectando a:\n${API_CONFIG.BASE_URL}`);
+  //   }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {

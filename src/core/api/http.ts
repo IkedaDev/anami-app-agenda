@@ -2,8 +2,7 @@ import * as SecureStore from "expo-secure-store";
 
 export const API_CONFIG = {
   // Usamos la variable de entorno o un fallback
-  BASE_URL:
-    process.env.EXPO_PUBLIC_API_URL || "https://api.ikedadev.com/anami/v1",
+  BASE_URL: process.env.EXPO_PUBLIC_API_URL,
   HEADERS: {
     "Content-Type": "application/json",
     Accept: "application/json",

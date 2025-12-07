@@ -3,4 +3,5 @@
 ## Publicacion
 
 eas build --profile production --platform android
-eas update --branch production --message "Arreglado error en calendario"
+$env:EXPO_PUBLIC_API_URL="https://api.ikedadev.com/anami/v1"; eas update --branch production --message "Forzando URL Prod"
+eas update --branch production --message ""

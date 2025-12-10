@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   FlatList,
   StyleSheet,
@@ -15,6 +14,8 @@ import { COLORS } from "../../core/theme/colors";
 import { usePatients } from "../../core/context/PatientContext";
 import { Patient } from "../../domain/models/patient";
 import { usePatientForm } from "../hooks/usePatientForm";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
 
 // --- SUB-COMPONENTE: FORMULARIO ---
 const PatientForm = ({
@@ -37,70 +38,42 @@ const PatientForm = ({
         {isEditing ? "Editar Cliente" : "Nuevo Cliente"}
       </Text>
 
-      <View style={styles.card}>
-        {/* NOMBRE (Obligatorio) */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Nombre *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: María Pérez"
-            placeholderTextColor="#B0A8A6"
-            value={form.name}
-            onChangeText={(text) => handleChange("name", text)}
-          />
-        </View>
-
-        {/* RUT */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>RUT</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: 12.345.678-9"
-            placeholderTextColor="#B0A8A6"
-            value={form.rut}
-            onChangeText={(text) => handleChange("rut", text)}
-          />
-        </View>
-
-        {/* CELULAR */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Celular</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="+56 9..."
-            placeholderTextColor="#B0A8A6"
-            keyboardType="phone-pad"
-            value={form.phone}
-            onChangeText={(text) => handleChange("phone", text)}
-          />
-        </View>
-
-        {/* CORREO */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Correo</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="correo@ejemplo.com"
-            placeholderTextColor="#B0A8A6"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={form.email}
-            onChangeText={(text) => handleChange("email", text)}
-          />
-        </View>
-
-        {/* DIRECCIÓN */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Dirección</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Calle, Número, Comuna"
-            placeholderTextColor="#B0A8A6"
-            value={form.address}
-            onChangeText={(text) => handleChange("address", text)}
-          />
-        </View>
-      </View>
+      <Card style={styles.formCard}>
+        <Input
+          label="Nombre *"
+          placeholder="Ej: María Pérez"
+          value={form.name}
+          onChangeText={(text) => handleChange("name", text)}
+        />
+        <Input
+          label="RUT"
+          placeholder="Ej: 12.345.678-9"
+          value={form.rut}
+          onChangeText={(text) => handleChange("rut", text)}
+        />
+        <Input
+          label="Celular"
+          placeholder="+56 9..."
+          keyboardType="phone-pad"
+          value={form.phone}
+          onChangeText={(text) => handleChange("phone", text)}
+        />
+        <Input
+          label="Correo"
+          placeholder="correo@ejemplo.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={form.email}
+          onChangeText={(text) => handleChange("email", text)}
+        />
+        <Input
+          label="Dirección"
+          placeholder="Calle, Número, Comuna"
+          value={form.address}
+          onChangeText={(text) => handleChange("address", text)}
+          containerStyle={{ marginBottom: 0 }}
+        />
+      </Card>
 
       <TouchableOpacity style={styles.saveButton} onPress={savePatient}>
         <Text style={styles.saveButtonText}>
@@ -137,26 +110,24 @@ export default function PatientsScreen() {
   };
 
   const renderItem = ({ item }: { item: Patient }) => (
-    <TouchableOpacity
-      style={styles.patientCard}
-      onPress={() => handleEdit(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.patientAvatar}>
-        <Text style={styles.avatarText}>
-          {item.name.charAt(0).toUpperCase()}
-        </Text>
-      </View>
-      <View style={styles.patientInfo}>
-        <Text style={styles.patientName}>{item.name}</Text>
-        {item.phone ? (
-          <Text style={styles.patientDetail}>{item.phone}</Text>
-        ) : null}
-        {item.email ? (
-          <Text style={styles.patientDetail}>{item.email}</Text>
-        ) : null}
-      </View>
-      <Text style={styles.editIcon}>✎</Text>
+    <TouchableOpacity onPress={() => handleEdit(item)} activeOpacity={0.7}>
+      <Card style={styles.patientCard}>
+        <View style={styles.patientAvatar}>
+          <Text style={styles.avatarText}>
+            {item.name.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.patientInfo}>
+          <Text style={styles.patientName}>{item.name}</Text>
+          {item.phone ? (
+            <Text style={styles.patientDetail}>{item.phone}</Text>
+          ) : null}
+          {item.email ? (
+            <Text style={styles.patientDetail}>{item.email}</Text>
+          ) : null}
+        </View>
+        <Text style={styles.editIcon}>✎</Text>
+      </Card>
     </TouchableOpacity>
   );
 
@@ -227,21 +198,13 @@ const styles = StyleSheet.create({
   addButtonText: { color: COLORS.primary, fontWeight: "600" },
   listContent: { padding: 20, paddingBottom: 100 },
 
-  // Card Cliente
+  // Estilos específicos para la Card de Item
   patientCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF",
     padding: 16,
     borderRadius: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#F0F0F0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 2,
   },
   patientAvatar: {
     width: 45,
@@ -263,37 +226,16 @@ const styles = StyleSheet.create({
   patientDetail: { fontSize: 13, color: COLORS.textLight },
   editIcon: { fontSize: 18, color: COLORS.textLight, padding: 5 },
 
-  // Estilos Formulario
-  card: {
-    backgroundColor: COLORS.cardBg,
+  // Estilos específicos para la Card de Formulario (Override)
+  formCard: {
     borderRadius: 24,
     padding: 24,
-    shadowColor: "#C47F6B",
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: COLORS.primary,
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
     marginBottom: 24,
-    borderWidth: 1,
     borderColor: COLORS.secondary,
-  },
-  inputGroup: { marginBottom: 20 },
-  label: {
-    fontSize: 13,
-    color: COLORS.textLight,
-    marginBottom: 6,
-    fontWeight: "500",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: "#FAFAFA",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    color: COLORS.textMain,
   },
   saveButton: {
     backgroundColor: COLORS.primary,

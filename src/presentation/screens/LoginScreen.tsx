@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Image,
@@ -12,19 +11,15 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaView } from "react-native-safe-area-context"; // <--- 1. IMPORTAR ESTO
+import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS } from "../../core/theme/colors";
 import { useAuth } from "../../core/context/AuthContext";
-import { API_CONFIG } from "../../core/api/http";
+import { Input } from "../components/Input";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { login, isLoading } = useAuth();
-
-  //   React.useEffect(() => {
-  //     Alert.alert("Debug URL", `Conectando a:\n${API_CONFIG.BASE_URL}`);
-  //   }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -43,7 +38,6 @@ export default function LoginScreen() {
   };
 
   return (
-    // 2. ENVOLVER TODO EN SAFE AREA VIEW
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
 
@@ -67,31 +61,25 @@ export default function LoginScreen() {
 
           {/* FORMULARIO */}
           <View style={styles.formContainer}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>CORREO ELECTRÓNICO</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="admin@anami.cl"
-                placeholderTextColor="#B0A8A6"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
+            <Input
+              label="CORREO ELECTRÓNICO"
+              placeholder="admin@anami.cl"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.loginInput}
+            />
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>CONTRASEÑA</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#B0A8A6"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-            </View>
+            <Input
+              label="CONTRASEÑA"
+              placeholder="••••••••"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              style={styles.loginInput}
+            />
 
             <TouchableOpacity
               style={[styles.loginButton, isLoading && styles.buttonDisabled]}
@@ -117,7 +105,6 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Nuevo estilo para el contenedor seguro
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -155,24 +142,9 @@ const styles = StyleSheet.create({
   formContainer: {
     width: "100%",
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    marginBottom: 8,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: "#FAFAFA",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+  loginInput: {
     borderRadius: 16,
     padding: 16,
-    fontSize: 16,
-    color: COLORS.textMain,
   },
   loginButton: {
     backgroundColor: COLORS.primary,

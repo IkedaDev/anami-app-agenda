@@ -12,9 +12,10 @@ import {
   RefreshControl,
 } from "react-native";
 import { useAppointments } from "../../core/context/AppointmentContext";
-import { useServices } from "../../core/context/ServiceContext"; // <--- 1. IMPORTAR CONTEXTO
+import { useServices } from "../../core/context/ServiceContext";
 import { COLORS } from "../../core/theme/colors";
 import { Appointment } from "../../domain/models/appointment";
+import { Card } from "../components/Card";
 
 interface HistoryScreenProps {
   onEdit: (appointment: Appointment) => void;
@@ -29,7 +30,6 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     isLoading,
   } = useAppointments();
 
-  // 2. OBTENER SERVICIOS DEL BACKEND
   const { services } = useServices();
 
   const [viewMode, setViewMode] = useState<"today" | "month" | "all">("today");
@@ -53,7 +53,6 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     );
   };
 
-  // 3. FILTRADO DE DATOS
   const filteredAppointments = useMemo(() => {
     if (viewMode === "all") {
       return appointments;
@@ -64,9 +63,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     return appointments.filter((appt) => isToday(appt.createdAt));
   }, [appointments, viewMode]);
 
-  // 4. CÁLCULOS DE RESUMEN
   const stats = useMemo(() => {
-    // Filtramos usando serviceMode (más seguro que isHotelService)
     const hotelAppointments = filteredAppointments.filter(
       (appt) => appt.serviceMode === "hotel"
     );
@@ -93,12 +90,8 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     const isHotel = item.serviceMode === "hotel";
 
     const getParticularDetails = () => {
-      // Recuperamos los IDs guardados
       const ids = item.selectedServiceIds || [];
-
       if (ids.length === 0) return "Servicio sin especificar";
-
-      // 5. MAPEO DINÁMICO (Usando 'services' del backend)
       return ids
         .map((id) => {
           const service = services.find((s) => s.id === id);
@@ -108,7 +101,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     };
 
     return (
-      <View style={styles.card}>
+      <Card style={styles.itemCard}>
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.patientName}>{item.patientName}</Text>
@@ -133,7 +126,6 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
             <>
               <Text style={styles.detailText}>Masaje {item.duration} min</Text>
               {item.hasNailCut && <Text style={styles.detailText}>• Uñas</Text>}
-              {/* 6. LIMPIEZA: Eliminado FacialType porque ya no existe en el modelo */}
             </>
           ) : (
             <Text style={styles.detailText}>{getParticularDetails()}</Text>
@@ -160,7 +152,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
             </View>
           )}
         </View>
-      </View>
+      </Card>
     );
   };
 
@@ -188,7 +180,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
         ))}
       </View>
 
-      <View style={styles.summaryCard}>
+      <Card style={styles.summaryCard}>
         <Text style={styles.summaryHeaderTitle}>
           {viewMode === "today"
             ? "Resumen del Día (Solo Hotel)"
@@ -243,7 +235,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
             ${stats.totalGeneral.toLocaleString("es-CL")}
           </Text>
         </View>
-      </View>
+      </Card>
     </View>
   );
 
@@ -357,7 +349,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   summaryCard: {
-    backgroundColor: "#FFF",
     borderRadius: 20,
     padding: 20,
     marginBottom: 24,
@@ -423,16 +414,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textMain,
   },
-  card: {
-    backgroundColor: COLORS.cardBg,
+  itemCard: {
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
     borderWidth: 1,
     borderColor: "#EEE",
   },

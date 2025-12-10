@@ -17,6 +17,7 @@ import { useServices } from "../../core/context/ServiceContext";
 import { OptionButton } from "../components/OptionButton";
 import { SectionTitle } from "../components/SectionTitle";
 import { Appointment } from "../../domain/models/appointment";
+import { Card } from "../components/Card";
 
 interface AppointmentScreenProps {
   appointmentToEdit?: Appointment | null;
@@ -55,7 +56,7 @@ export default function AppointmentScreen({
           <Text style={styles.headerDate}>{formState.date}</Text>
         </View>
 
-        <View style={styles.card}>
+        <Card style={styles.mainCard}>
           {/* SELECTOR DE MODO */}
           <View style={styles.modeTabs}>
             <TouchableOpacity
@@ -174,7 +175,6 @@ export default function AppointmentScreen({
 
           {formState.serviceMode === "hotel" ? (
             <>
-              {/* Solo Masaje y Uñas, Facial ELIMINADO */}
               <View style={styles.inputGroup}>
                 <SectionTitle title="Masaje Express" />
                 <View style={styles.row}>
@@ -258,7 +258,7 @@ export default function AppointmentScreen({
               </View>
             </>
           )}
-        </View>
+        </Card>
 
         {/* RESUMEN FINANCIERO */}
         <View style={styles.summaryContainer}>
@@ -332,7 +332,6 @@ export default function AppointmentScreen({
 }
 
 const styles = StyleSheet.create({
-  // ... (Mismos estilos que antes) ...
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -354,8 +353,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 5,
   },
-  card: {
-    backgroundColor: COLORS.cardBg,
+  mainCard: {
     borderRadius: 24,
     padding: 24,
     shadowColor: "#C47F6B",

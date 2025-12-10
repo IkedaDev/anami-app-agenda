@@ -2,11 +2,7 @@ import { useState, useEffect } from "react";
 import { Alert } from "react-native";
 import { Patient, PatientState } from "../../domain/models/patient";
 import { usePatients } from "../../core/context/PatientContext";
-
-// Generador de ID simple
-const generateUUID = () =>
-  Math.random().toString(36).substring(2, 15) +
-  Math.random().toString(36).substring(2, 15);
+import { generateUUID } from "../../core/utils/uuid";
 
 export const usePatientForm = (
   patientToEdit?: Patient | null,

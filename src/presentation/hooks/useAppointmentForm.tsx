@@ -15,18 +15,15 @@ import { Patient } from "../../domain/models/patient";
 import { PatientRepositoryImpl } from "../../data/repositories/PatientRepositoryImpl";
 import { AppointmentRepositoryImpl } from "../../data/repositories/AppointmentRepositoryImpl";
 
+import { generateUUID } from "../../core/utils/uuid";
+import {
+  toLocalISOString,
+  formatDateToChile,
+  getTimestampForTime,
+} from "../../core/utils/date";
+
 const patientRepo = new PatientRepositoryImpl();
 const appointmentRepo = new AppointmentRepositoryImpl();
-
-// --- 1. HELPERS DE FECHA (ZONA HORARIA CHILE) ---
-
-// Formateador para API (YYYY-MM-DD) forzando Chile
-const chileISOFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Santiago",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
 
 // Formateador para Título (Sábado 6 de Diciembre) forzando Chile
 const chileTextFormatter = new Intl.DateTimeFormat("es-CL", {
@@ -36,29 +33,10 @@ const chileTextFormatter = new Intl.DateTimeFormat("es-CL", {
   month: "long",
 });
 
-const toLocalISOString = (date: Date) => {
-  return chileISOFormatter.format(date);
-};
-
 const toSpanishDateString = (date: Date) => {
   // capitalizeFirstLetter manual porque Intl devuelve minúsculas
   const str = chileTextFormatter.format(date);
   return str.charAt(0).toUpperCase() + str.slice(1);
-};
-
-const getTimestampForTime = (baseDate: Date, timeStr: string): number => {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  const date = new Date(baseDate);
-  date.setHours(hours, minutes, 0, 0);
-  return date.getTime();
-};
-
-const generateUUID = () => {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 };
 
 const generateAllDailySlots = () => {
@@ -266,7 +244,7 @@ export const useAppointmentForm = (
       // Título con fecha de Chile
       setFormState((prev) => ({
         ...prev,
-        date: toSpanishDateString(baseDate),
+        date: formatDateToChile(baseDate),
         patientName: "",
         duration: null as any,
         selectedTime: "",

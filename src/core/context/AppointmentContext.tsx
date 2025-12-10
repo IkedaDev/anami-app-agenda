@@ -31,7 +31,7 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [lastDoc, setLastDoc] = useState<any>(1);
+  const [currentPage, setCurrentPage] = useState<any>(1);
   const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
@@ -41,10 +41,10 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
   const loadInitialData = async () => {
     setIsLoading(true);
     try {
-      const { appointments: newApps, lastDoc: newLastDoc } =
+      const { appointments: newApps, lastDoc: newCurrentPage } =
         await repository.getPaginated(PAGE_SIZE);
       setAppointments(newApps);
-      setLastDoc(newLastDoc);
+      setCurrentPage(newCurrentPage);
       setHasMore(newApps.length === PAGE_SIZE);
     } catch (error) {
       console.error(error);
@@ -64,12 +64,12 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
 
     setIsLoadingMore(true);
     try {
-      const { appointments: newApps, lastDoc: newLastDoc } =
-        await repository.getPaginated(PAGE_SIZE, lastDoc);
+      const { appointments: newApps, lastDoc: newCurrentPage } =
+        await repository.getPaginated(PAGE_SIZE, currentPage);
 
       if (newApps.length > 0) {
         setAppointments((prev) => [...prev, ...newApps]);
-        setLastDoc(newLastDoc);
+        setCurrentPage(newCurrentPage);
         if (newApps.length < PAGE_SIZE) setHasMore(false);
       } else {
         setHasMore(false);

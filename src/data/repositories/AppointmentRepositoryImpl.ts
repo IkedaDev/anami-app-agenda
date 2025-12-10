@@ -1,6 +1,7 @@
 import { httpClient } from "../../core/api/http";
 import { Appointment } from "../../domain/models/appointment";
 import { IAppointmentRepository } from "../../domain/repositories";
+import { formatDateToChile, formatTime } from "../../core/utils/date";
 
 export class AppointmentRepositoryImpl implements IAppointmentRepository {
   async getAvailability(
@@ -43,11 +44,7 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
 
       return {
         id: appt.id,
-        date: new Date(appt.startsAt).toLocaleDateString("es-CL", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-        }),
+        date: formatDateToChile(appt.startsAt),
         patientName: appt.client.fullName,
         patientId: appt.clientId,
         serviceMode: isHotel ? "hotel" : "particular",
@@ -57,10 +54,7 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
         // facialType ya no lo mapeamos porque ya no existe en el frontend
 
         selectedServiceIds: serviceIds,
-        selectedTime: new Date(appt.startsAt).toLocaleTimeString("es-CL", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        selectedTime: formatTime(appt.startsAt),
 
         total: appt.totalPrice,
         anamiShare: appt.anamiShare,

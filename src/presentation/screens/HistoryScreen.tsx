@@ -4,7 +4,6 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Platform,
   TouchableOpacity,
@@ -16,6 +15,8 @@ import { useServices } from "../../core/context/ServiceContext";
 import { COLORS } from "../../core/theme/colors";
 import { Appointment } from "../../domain/models/appointment";
 import { Card } from "../components/Card";
+import { isSameDay, isCurrentMonth } from "../../core/utils/date";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface HistoryScreenProps {
   onEdit: (appointment: Appointment) => void;
@@ -34,25 +35,6 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
 
   const [viewMode, setViewMode] = useState<"today" | "month" | "all">("today");
 
-  const isToday = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    return (
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
-    );
-  };
-
-  const isCurrentMonth = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    return (
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
-    );
-  };
-
   const filteredAppointments = useMemo(() => {
     if (viewMode === "all") {
       return appointments;
@@ -60,7 +42,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
     if (viewMode === "month") {
       return appointments.filter((appt) => isCurrentMonth(appt.createdAt));
     }
-    return appointments.filter((appt) => isToday(appt.createdAt));
+    return appointments.filter((appt) => isSameDay(appt.createdAt));
   }, [appointments, viewMode]);
 
   const stats = useMemo(() => {
@@ -86,7 +68,7 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
   }, [filteredAppointments]);
 
   const renderItem = ({ item }: { item: Appointment }) => {
-    const editable = isToday(item.createdAt);
+    const editable = isSameDay(item.createdAt);
     const isHotel = item.serviceMode === "hotel";
 
     const getParticularDetails = () => {

@@ -10,9 +10,9 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
-  Modal, // <--- Importante: Importar Modal
+  Modal, // Necesario para iOS
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker"; // Importar librería
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { COLORS } from "../../core/theme/colors";
 import { useAppointmentForm } from "../hooks/useAppointmentForm";
 import { useServices } from "../../core/context/ServiceContext";
@@ -39,7 +39,7 @@ export default function AppointmentScreen({
     isSaving,
     loadingSlots,
     actions,
-    dateObject, // Asegúrate de que tu hook devuelva esto (ver paso anterior)
+    dateObject,
   } = useAppointmentForm(appointmentToEdit, onSuccess);
 
   const { services, isLoading: isLoadingServices } = useServices();
@@ -48,22 +48,17 @@ export default function AppointmentScreen({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState(new Date());
 
-  // Sincronizar fecha temporal cuando se abre el modal o cambia la fecha real
   useEffect(() => {
-    if (dateObject) {
-      setTempDate(dateObject);
-    }
+    if (dateObject) setTempDate(dateObject);
   }, [dateObject, showDatePicker]);
 
   const handlePlatformDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") {
       setShowDatePicker(false);
-      if (event.type === "set" && selectedDate) {
+      if (event.type === "set" && selectedDate)
         actions.changeDate(selectedDate);
-      }
-    } else {
-      // En iOS solo actualizamos el estado temporal visual
-      if (selectedDate) setTempDate(selectedDate);
+    } else if (selectedDate) {
+      setTempDate(selectedDate);
     }
   };
 
@@ -79,29 +74,32 @@ export default function AppointmentScreen({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
+        {/* --- HEADER --- */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
             {isEditing ? "Editar Cita" : "Nueva Cita"}
           </Text>
 
-          {/* BOTÓN DE FECHA MEJORADO */}
           <TouchableOpacity
             style={styles.dateSelector}
             onPress={() => setShowDatePicker(true)}
             activeOpacity={0.7}
           >
+            <Text style={styles.dateIcon}>🗓️</Text>
             <Text style={styles.dateSelectorText}>{formState.date}</Text>
-            <Text style={styles.editIcon}>📅</Text>
+            {/* <Text style={styles.editHint}>Editar</Text> */}
           </TouchableOpacity>
         </View>
 
-        {/* ... (Resto del contenido: Card, Tabs, Inputs, etc. SIN CAMBIOS) ... */}
+        {/* --- TARJETA 1: CONFIGURACIÓN DEL SERVICIO --- */}
+        <Card style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Configuración del Servicio</Text>
+          </View>
 
-        {/* === PEGAR AQUÍ EL CONTENIDO DE TU PANTALLA ANTERIOR === */}
-        <Card style={styles.mainCard}>
-          {/* ... Código de tus tabs, inputs, services ... */}
-          {/* (Mantén todo el código que ya tenías dentro del ScrollView) */}
+          {/* Selector de Modo */}
           <View style={styles.modeTabs}>
             <TouchableOpacity
               style={[
@@ -138,13 +136,114 @@ export default function AppointmentScreen({
             </TouchableOpacity>
           </View>
 
-          {/* PACIENTE */}
+          {/* Lógica de Servicios */}
+          {formState.serviceMode === "hotel" ? (
+            <View style={styles.sectionContainer}>
+              <View style={styles.inputGroup}>
+                <SectionTitle title="Masaje Express" />
+                <View style={styles.row}>
+                  <OptionButton
+                    label="20 min"
+                    selected={formState.duration === 20}
+                    onPress={() => actions.setDuration(20)}
+                  />
+                  <OptionButton
+                    label="40 min"
+                    selected={formState.duration === 40}
+                    onPress={() => actions.setDuration(40)}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <SectionTitle title="Adicionales" />
+                <View style={styles.row}>
+                  <OptionButton
+                    label="Sin corte"
+                    selected={!formState.hasNailCut}
+                    onPress={() => actions.setHasNailCut(false)}
+                  />
+                  <OptionButton
+                    label="Corte Uñas (+$5.000)"
+                    selected={formState.hasNailCut}
+                    onPress={() => actions.setHasNailCut(true)}
+                  />
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.sectionContainer}>
+              <SectionTitle title="Selecciona Servicios" />
+              {isLoadingServices ? (
+                <ActivityIndicator
+                  size="large"
+                  color={COLORS.primary}
+                  style={{ margin: 20 }}
+                />
+              ) : (
+                <View style={styles.servicesGrid}>
+                  {services.map((service) => {
+                    const isSelected = formState.selectedServiceIds.includes(
+                      service.id
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={service.id}
+                        style={[
+                          styles.serviceChip,
+                          isSelected && styles.serviceChipSelected,
+                        ]}
+                        onPress={() => actions.toggleService(service.id)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.serviceText,
+                              isSelected && styles.serviceTextSelected,
+                            ]}
+                          >
+                            {service.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.servicePrice,
+                              isSelected && styles.serviceTextSelected,
+                            ]}
+                          >
+                            {service.duration} min
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.servicePriceBold,
+                            isSelected && styles.serviceTextSelected,
+                          ]}
+                        >
+                          ${service.price.toLocaleString("es-CL")}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          )}
+        </Card>
+
+        {/* --- TARJETA 2: DETALLES DE LA CITA --- */}
+        <Card style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Detalles del Agendamiento</Text>
+          </View>
+
+          {/* Input Paciente */}
           <View style={[styles.inputGroup, { zIndex: 100 }]}>
             <Text style={styles.label}>Paciente</Text>
             <View>
               <TextInput
                 style={styles.input}
-                placeholder="Nombre del paciente"
+                placeholder="Nombre completo"
                 placeholderTextColor="#B0A8A6"
                 value={formState.patientName}
                 onChangeText={actions.setPatientName}
@@ -170,145 +269,73 @@ export default function AppointmentScreen({
             </View>
           </View>
 
-          {/* TIME PICKER */}
+          <View style={styles.divider} />
+
+          {/* Time Picker - Lógica condicional elegante */}
           <View style={styles.inputGroup}>
             <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+              }}
             >
-              <SectionTitle title="Hora de Inicio" />
+              <SectionTitle title="Horarios Disponibles" />
               {loadingSlots && (
                 <ActivityIndicator size="small" color={COLORS.primary} />
               )}
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.timeScroll}
-            >
-              {timeSlots.map((slot) => {
-                const isSelected = formState.selectedTime === slot.time;
-                const isDisabled = !slot.available && !isSelected;
-                return (
-                  <TouchableOpacity
-                    key={slot.time}
-                    disabled={isDisabled}
-                    style={[
-                      styles.timeChip,
-                      isSelected && styles.timeChipSelected,
-                      isDisabled && styles.timeChipDisabled,
-                    ]}
-                    onPress={() => actions.setSelectedTime(slot.time)}
-                  >
-                    <Text
+            {formState.duration === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>⏳</Text>
+                <Text style={styles.emptyStateText}>
+                  Selecciona un servicio arriba para ver los horarios
+                  disponibles.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.timeScroll}
+              >
+                {timeSlots.map((slot) => {
+                  const isSelected = formState.selectedTime === slot.time;
+                  const isDisabled = !slot.available && !isSelected;
+                  return (
+                    <TouchableOpacity
+                      key={slot.time}
+                      disabled={isDisabled}
                       style={[
-                        styles.timeText,
-                        isSelected && styles.timeTextSelected,
-                        isDisabled && styles.timeTextDisabled,
+                        styles.timeChip,
+                        isSelected && styles.timeChipSelected,
+                        isDisabled && styles.timeChipDisabled,
                       ]}
+                      onPress={() => actions.setSelectedTime(slot.time)}
                     >
-                      {slot.time}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                      <Text
+                        style={[
+                          styles.timeText,
+                          isSelected && styles.timeTextSelected,
+                          isDisabled && styles.timeTextDisabled,
+                        ]}
+                      >
+                        {slot.time}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
-
-          {/* --- FORMULARIO DINÁMICO --- */}
-
-          {formState.serviceMode === "hotel" ? (
-            <>
-              <View style={styles.inputGroup}>
-                <SectionTitle title="Masaje Express" />
-                <View style={styles.row}>
-                  <OptionButton
-                    label="20 min"
-                    selected={formState.duration === 20}
-                    onPress={() => actions.setDuration(20)}
-                  />
-                  <OptionButton
-                    label="40 min"
-                    selected={formState.duration === 40}
-                    onPress={() => actions.setDuration(40)}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <SectionTitle title="Corte de Uñas" />
-                <View style={styles.row}>
-                  <OptionButton
-                    label="No"
-                    selected={!formState.hasNailCut}
-                    onPress={() => actions.setHasNailCut(false)}
-                  />
-                  <OptionButton
-                    label="Sí (+$5.000)"
-                    selected={formState.hasNailCut}
-                    onPress={() => actions.setHasNailCut(true)}
-                  />
-                </View>
-              </View>
-            </>
-          ) : (
-            <>
-              {/* FORMULARIO PARTICULAR */}
-              <View style={styles.inputGroup}>
-                <SectionTitle title="Servicios Particulares (Selección Múltiple)" />
-
-                {isLoadingServices ? (
-                  <View style={{ padding: 20 }}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
-                  </View>
-                ) : (
-                  <View style={styles.servicesGrid}>
-                    {services.map((service) => {
-                      const isSelected = formState.selectedServiceIds.includes(
-                        service.id
-                      );
-
-                      return (
-                        <TouchableOpacity
-                          key={service.id}
-                          style={[
-                            styles.serviceChip,
-                            isSelected && styles.serviceChipSelected,
-                          ]}
-                          onPress={() => actions.toggleService(service.id)}
-                        >
-                          <Text
-                            style={[
-                              styles.serviceText,
-                              isSelected && styles.serviceTextSelected,
-                            ]}
-                          >
-                            {service.name}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.servicePrice,
-                              isSelected && styles.serviceTextSelected,
-                            ]}
-                          >
-                            ${service.price.toLocaleString("es-CL")} •{" "}
-                            {service.duration}m
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            </>
-          )}
         </Card>
 
-        {/* RESUMEN FINANCIERO Y BOTONES (Igual que antes) */}
+        {/* --- RESUMEN Y ACCIONES --- */}
         <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Resumen Financiero</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Servicio</Text>
+            <Text style={styles.summaryLabel}>Total a Pagar</Text>
             <Text style={styles.summaryValue}>
               ${financialSummary.total.toLocaleString("es-CL")}
             </Text>
@@ -324,7 +351,7 @@ export default function AppointmentScreen({
                   ${financialSummary.anamiShare.toLocaleString("es-CL")}
                 </Text>
               </View>
-              <View style={styles.divider} />
+              <View style={styles.splitDivider} />
               <View style={styles.splitRow}>
                 <Text style={[styles.splitLabel, { color: COLORS.hotel }]}>
                   Hotel (40%)
@@ -350,7 +377,7 @@ export default function AppointmentScreen({
             <ActivityIndicator color="#FFF" />
           ) : (
             <Text style={styles.saveButtonText}>
-              {isEditing ? "Actualizar Cita" : "Registrar Cita"}
+              {isEditing ? "Guardar Cambios" : "Confirmar Cita"}
             </Text>
           )}
         </TouchableOpacity>
@@ -362,19 +389,16 @@ export default function AppointmentScreen({
               onPress={actions.handleDelete}
               activeOpacity={0.7}
             >
-              <Text style={styles.deleteButtonText}>Cancelar Cita</Text>
+              <Text style={styles.deleteButtonText}>Eliminar Cita</Text>
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.cancelButton} onPress={onSuccess}>
-              <Text style={styles.cancelButtonText}>Volver sin guardar</Text>
+              <Text style={styles.cancelButtonText}>Cancelar edición</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
 
-      {/* --- LÓGICA DEL PICKER --- */}
-
-      {/* Opción 1: Picker Nativo para Android (Invisible hasta que se activa) */}
+      {/* --- MODALES --- */}
       {Platform.OS === "android" && showDatePicker && (
         <DateTimePicker
           value={dateObject || new Date()}
@@ -385,7 +409,6 @@ export default function AppointmentScreen({
         />
       )}
 
-      {/* Opción 2: Modal Customizado para iOS */}
       {Platform.OS === "ios" && (
         <Modal
           transparent={true}
@@ -395,18 +418,15 @@ export default function AppointmentScreen({
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              {/* Header del Modal */}
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
                   <Text style={styles.modalCancelText}>Cancelar</Text>
                 </TouchableOpacity>
-                <Text style={styles.modalTitle}>Seleccionar Fecha</Text>
+                <Text style={styles.modalTitle}>Fecha</Text>
                 <TouchableOpacity onPress={confirmIOSDate}>
                   <Text style={styles.modalConfirmText}>Confirmar</Text>
                 </TouchableOpacity>
               </View>
-
-              {/* Picker iOS */}
               <View
                 style={{
                   width: "100%",
@@ -417,14 +437,14 @@ export default function AppointmentScreen({
                 <DateTimePicker
                   value={tempDate}
                   mode="date"
-                  display="spinner" // O 'inline' si prefieres calendario completo
+                  display="spinner"
                   onChange={handlePlatformDateChange}
                   minimumDate={new Date(2024, 0, 1)}
                   locale="es-ES"
                   textColor="black"
                   style={{
                     height: 210,
-                    width: "100%", // <--- IMPORTANTE: Ocupar todo el ancho
+                    width: "100%",
                     backgroundColor: "white",
                   }}
                 />
@@ -437,143 +457,197 @@ export default function AppointmentScreen({
   );
 }
 
-// --- ESTILOS ACTUALIZADOS ---
 const styles = StyleSheet.create({
-  // ... (Tus estilos existentes container, header, inputGroup, etc. COPIALOS AQUI)
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: "#F7F8FA", // Fondo más moderno
     paddingTop: Platform.OS === "android" ? 30 : 0,
   },
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: 20, paddingBottom: 50 },
+
+  // Header
   header: { marginBottom: 20, marginTop: 10 },
   headerTitle: {
     fontSize: 28,
-    fontWeight: "300",
+    fontWeight: "700",
     color: COLORS.textMain,
-    letterSpacing: -0.5,
+    marginBottom: 8,
   },
-
-  // NUEVO: Estilo para el botón de fecha
   dateSelector: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5", // Un fondo suave para indicar que es tocable
+    backgroundColor: "#FFF",
     alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: "#EFEFEF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
+  dateIcon: { fontSize: 16, marginRight: 8 },
   dateSelectorText: {
     fontSize: 16,
+    color: COLORS.textMain,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  editHint: {
+    marginLeft: 8,
+    fontSize: 12,
     color: COLORS.primary,
     fontWeight: "600",
-    textTransform: "capitalize", // Para que "sábado" sea "Sábado"
-  },
-  editIcon: {
-    marginLeft: 8,
-    fontSize: 14,
   },
 
-  // ... (Resto de estilos existentes: mainCard, modeTabs, input, etc.) ...
-  mainCard: {
+  // Cards
+  card: {
+    backgroundColor: "#FFF",
     borderRadius: 24,
-    padding: 24,
-    shadowColor: "#C47F6B",
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 5,
-    marginBottom: 24,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: COLORS.secondary,
+    borderColor: "rgba(0,0,0,0.02)",
   },
+  cardHeader: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+    paddingBottom: 15,
+    marginBottom: 15,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.textMain,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  sectionContainer: { marginTop: 5 },
+
+  // Mode Tabs
   modeTabs: {
     flexDirection: "row",
-    backgroundColor: "#F0F0F0",
-    borderRadius: 12,
-    padding: 4,
+    backgroundColor: "#F5F6F8",
+    borderRadius: 16,
+    padding: 5,
     marginBottom: 20,
   },
   modeTab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 12,
   },
   modeTabActive: {
     backgroundColor: "#FFF",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 2,
   },
-  modeTabText: { fontSize: 14, fontWeight: "500", color: COLORS.textLight },
+  modeTabText: { fontSize: 14, fontWeight: "600", color: COLORS.textLight },
   modeTabTextActive: { color: COLORS.primary, fontWeight: "700" },
-  inputGroup: { marginBottom: 24 },
+
+  // Inputs
+  inputGroup: { marginBottom: 20 },
   label: {
     fontSize: 14,
-    color: COLORS.textLight,
+    color: COLORS.textMain,
     marginBottom: 8,
-    fontWeight: "500",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    fontWeight: "600",
   },
   input: {
     backgroundColor: "#FAFAFA",
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 12,
-    padding: 14,
+    borderColor: "#E1E4E8",
+    borderRadius: 14,
+    padding: 16,
     fontSize: 16,
     color: COLORS.textMain,
   },
-  timeScroll: { paddingVertical: 5, gap: 10 },
-  timeChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    backgroundColor: "#FAFAFA",
-    marginRight: 8,
-  },
-  timeChipSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  timeChipDisabled: {
-    backgroundColor: "#F5F5F5",
-    borderColor: "#EEE",
-    opacity: 0.5,
-  },
-  timeText: { color: COLORS.textLight, fontWeight: "500" },
-  timeTextSelected: { color: "#FFF", fontWeight: "700" },
-  timeTextDisabled: { color: "#CCC", textDecorationLine: "line-through" },
+
+  // Services
   servicesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   serviceChip: {
-    width: "48%",
-    padding: 12,
-    borderRadius: 12,
+    width: "48%", // 2 Columnas
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#EEE",
     backgroundColor: "#FAFAFA",
-    marginBottom: 5,
+    marginBottom: 6,
+    justifyContent: "space-between",
   },
   serviceChipSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   serviceText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
     color: COLORS.textMain,
     marginBottom: 4,
   },
   servicePrice: { fontSize: 12, color: COLORS.textLight },
+  servicePriceBold: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.textMain,
+    marginTop: 4,
+  },
   serviceTextSelected: { color: "#FFF" },
+
+  // Time Picker
+  timeScroll: { paddingVertical: 5, gap: 8 },
+  timeChip: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#FFF",
+    marginRight: 6,
+  },
+  timeChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  timeChipDisabled: {
+    backgroundColor: "#F9F9F9",
+    borderColor: "#F0F0F0",
+    opacity: 0.4,
+  },
+  timeText: { color: COLORS.textMain, fontWeight: "600", fontSize: 14 },
+  timeTextSelected: { color: "#FFF", fontWeight: "700" },
+  timeTextDisabled: { color: "#CCC", textDecorationLine: "line-through" },
+
+  // Empty State
+  emptyState: {
+    backgroundColor: "#FAFAFA",
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+    borderStyle: "dashed",
+  },
+  emptyStateIcon: { fontSize: 24, marginBottom: 8 },
+  emptyStateText: {
+    color: COLORS.textLight,
+    textAlign: "center",
+    fontSize: 14,
+  },
+
+  // Suggestions
   suggestionsContainer: {
     position: "absolute",
     top: "100%",
@@ -583,7 +657,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 4,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#EEE",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -598,28 +672,27 @@ const styles = StyleSheet.create({
   },
   suggestionText: { fontSize: 16, color: COLORS.textMain },
   suggestionSubText: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
+
+  // Common
   row: { flexDirection: "row", gap: 10 },
-  summaryContainer: { marginBottom: 30 },
-  summaryTitle: {
-    fontSize: 18,
-    color: COLORS.textMain,
-    marginBottom: 15,
-    fontWeight: "300",
-  },
+  divider: { height: 1, backgroundColor: "#EFEFEF", marginVertical: 20 },
+
+  // Summary
+  summaryContainer: { marginBottom: 30, paddingHorizontal: 10 },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 15,
   },
-  summaryLabel: { fontSize: 20, fontWeight: "500", color: COLORS.textMain },
-  summaryValue: { fontSize: 24, fontWeight: "700", color: COLORS.textMain },
+  summaryLabel: { fontSize: 18, fontWeight: "600", color: COLORS.textLight },
+  summaryValue: { fontSize: 26, fontWeight: "700", color: COLORS.textMain },
   splitBox: {
     backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#EEE",
+    borderColor: "#E1E4E8",
   },
   splitRow: {
     flexDirection: "row",
@@ -628,59 +701,57 @@ const styles = StyleSheet.create({
   },
   splitLabel: { fontSize: 14, fontWeight: "500" },
   splitValue: { fontSize: 16, fontWeight: "700" },
-  divider: { height: 1, backgroundColor: "#EEE", marginVertical: 8 },
+  splitDivider: { height: 1, backgroundColor: "#EEE", marginVertical: 8 },
+
+  // Buttons
   saveButton: {
     backgroundColor: COLORS.primary,
     padding: 18,
-    borderRadius: 50,
+    borderRadius: 16,
     alignItems: "center",
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
   },
   updateButton: { backgroundColor: COLORS.hotel },
   saveButtonText: {
     color: "#FFF",
     fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: 1,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
-  actionsContainer: {
-    marginTop: 20,
-    gap: 15,
-  },
+  actionsContainer: { marginTop: 20, gap: 10 },
   deleteButton: {
     backgroundColor: "#FFF",
     paddingVertical: 16,
-    borderRadius: 50,
+    borderRadius: 16,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#FF6B6B",
-    marginBottom: 5,
+    borderWidth: 2,
+    borderColor: "#FFE5E5",
   },
-  deleteButtonText: {
-    color: "#FF6B6B",
-    fontSize: 16,
-    fontWeight: "600",
+  deleteButtonText: { color: "#FF6B6B", fontSize: 16, fontWeight: "700" },
+  cancelButton: { alignItems: "center", padding: 10 },
+  cancelButtonText: {
+    color: COLORS.textLight,
+    fontSize: 15,
+    fontWeight: "500",
   },
-  cancelButton: { marginTop: 5, alignItems: "center", padding: 10 },
-  cancelButtonText: { color: COLORS.textLight, fontSize: 16 },
 
-  // --- ESTILOS DEL MODAL (NUEVO) ---
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)", // Fondo oscurecido
-    justifyContent: "flex-end", // Alineado al fondo (Estilo iOS sheet)
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: "#FFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 30, // Espacio para el safe area inferior
-    width: "100%", // Asegurar ancho del contenedor
-    overflow: "hidden", // Para que respete los bordes redondeados
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34,
+    width: "100%",
+    overflow: "hidden",
   },
   modalHeader: {
     flexDirection: "row",
@@ -690,21 +761,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#EEE",
     backgroundColor: "#FAFAFA",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
   },
-  modalTitle: {
-    fontWeight: "700",
-    fontSize: 16,
-    color: COLORS.textMain,
-  },
-  modalCancelText: {
-    color: COLORS.textLight,
-    fontSize: 16,
-  },
-  modalConfirmText: {
-    color: COLORS.primary,
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  modalTitle: { fontWeight: "700", fontSize: 16, color: COLORS.textMain },
+  modalCancelText: { color: COLORS.textLight, fontSize: 16 },
+  modalConfirmText: { color: COLORS.primary, fontSize: 16, fontWeight: "600" },
 });

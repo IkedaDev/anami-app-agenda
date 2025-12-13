@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Alert } from "react-native";
 import {
   Appointment,
@@ -20,6 +20,7 @@ import {
   toLocalISOString,
   formatDateToChile,
   getTimestampForTime,
+  isSameDay,
 } from "../../core/utils/date";
 
 const patientRepo = new PatientRepositoryImpl();
@@ -62,11 +63,13 @@ export const useAppointmentForm = (
   const { patients } = usePatients();
   const { services } = useServices();
 
-  const baseDate = useMemo(() => {
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
     return appointmentToEdit
       ? new Date(appointmentToEdit.scheduledStart)
       : new Date();
-  }, [appointmentToEdit]);
+  });
+
+  const baseDate = selectedDate;
 
   const [formState, setFormState] = useState<
     AppointmentState & { selectedServiceIds: string[] }
@@ -150,9 +153,16 @@ export const useAppointmentForm = (
     const now = new Date();
 
     const mappedSlots = allSlots.map((time) => {
+      // Usamos selectedDate (baseDate) para calcular el timestamp
       const slotStart = getTimestampForTime(baseDate, time);
-      // Margen de 1 minuto
-      const isPast = slotStart < now.getTime() - 60000;
+
+      // Lógica: Si es HOY, bloqueamos pasado. Si es FUTURO, no bloqueamos.
+      // Si es PASADO (ayer), bloqueamos todo (o lo dejas abierto si quieres agendar retroactivo)
+      const isToday = isSameDay(baseDate.getTime(), now.getTime());
+      const isPastTime = isToday && slotStart < now.getTime() - 60000;
+
+      // Nota: Si quieres permitir agendar en días pasados, ajusta esta lógica.
+      // Aquí asumimos que si cambias de día, quieres ver los slots libres de ese día.
 
       const isAvailable =
         availableSlotsFromApi.includes(time) ||
@@ -160,17 +170,24 @@ export const useAppointmentForm = (
 
       return {
         time,
-        available: !isPast && isAvailable,
-        isPast,
+        available: !isPastTime && isAvailable, // Si es futuro, isPastTime será false siempre que slotStart > now
+        isPast: isPastTime,
       };
     });
 
-    const futureSlots = mappedSlots.filter((s) => !s.isPast);
-    const firstAvailableIndex = futureSlots.findIndex((s) => s.available);
-
-    return firstAvailableIndex === -1
-      ? []
-      : futureSlots.slice(firstAvailableIndex);
+    if (isSameDay(baseDate.getTime(), now.getTime())) {
+      const futureSlots = mappedSlots.filter((s) => !s.isPast);
+      const firstAvailableIndex = futureSlots.findIndex((s) => s.available);
+      return firstAvailableIndex === -1
+        ? []
+        : futureSlots.slice(firstAvailableIndex);
+    } else if (baseDate.getTime() > now.getTime()) {
+      // Futuro: Mostrar todo
+      return mappedSlots;
+    } else {
+      // Pasado: Mostrar todo (por si quiere registrar algo que ya hizo) o nada
+      return mappedSlots;
+    }
   }, [availableSlotsFromApi, baseDate, appointmentToEdit]);
 
   const suggestions = useMemo(() => {
@@ -182,6 +199,14 @@ export const useAppointmentForm = (
   }, [patients, formState.patientName, showSuggestions]);
 
   // --- EFECTOS ---
+  useEffect(() => {
+    // Si estamos editando, respetamos la fecha original al inicio,
+    // pero si el usuario cambia selectedDate, actualizamos el texto.
+    setFormState((prev) => ({
+      ...prev,
+      date: formatDateToChile(selectedDate),
+    }));
+  }, [selectedDate]);
 
   // 1. Cargar Disponibilidad (Forzando Chile)
   useEffect(() => {
@@ -240,6 +265,7 @@ export const useAppointmentForm = (
         selectedServiceIds: appointmentToEdit.selectedServiceIds || [],
         selectedTime: appointmentToEdit.selectedTime || "",
       });
+      setSelectedDate(new Date(appointmentToEdit.scheduledStart));
     } else {
       // Título con fecha de Chile
       setFormState((prev) => ({
@@ -250,11 +276,16 @@ export const useAppointmentForm = (
         selectedTime: "",
       }));
     }
-  }, [appointmentToEdit, baseDate]);
+  }, [appointmentToEdit]);
 
   // --- HANDLERS ---
 
   const actions = {
+    changeDate: (newDate: Date) => {
+      setSelectedDate(newDate);
+      // Limpiamos la hora seleccionada porque los slots cambiarán
+      setFormState((prev) => ({ ...prev, selectedTime: "" }));
+    },
     setPatientName: (t: string) => {
       setFormState((p) => ({ ...p, patientName: t, patientId: undefined }));
       setShowSuggestions(true);
@@ -412,5 +443,6 @@ export const useAppointmentForm = (
     isSaving,
     loadingSlots,
     actions,
+    dateObject: selectedDate,
   };
 };

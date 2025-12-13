@@ -38,9 +38,7 @@
         "projectId": "1f218a25-3482-40f6-84a1-dcd195ff5358"
       }
     },
-    "plugins": [
-      "expo-secure-store"
-    ],
+    "plugins": ["expo-secure-store", "./withAndroidAccent.js"],
     "runtimeVersion": {
       "policy": "appVersion"
     }

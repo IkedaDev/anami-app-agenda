@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,7 +10,9 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
+  Modal, // <--- Importante: Importar Modal
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker"; // Importar librería
 import { COLORS } from "../../core/theme/colors";
 import { useAppointmentForm } from "../hooks/useAppointmentForm";
 import { useServices } from "../../core/context/ServiceContext";
@@ -37,9 +39,38 @@ export default function AppointmentScreen({
     isSaving,
     loadingSlots,
     actions,
+    dateObject, // Asegúrate de que tu hook devuelva esto (ver paso anterior)
   } = useAppointmentForm(appointmentToEdit, onSuccess);
 
   const { services, isLoading: isLoadingServices } = useServices();
+
+  // Estados para el selector de fecha
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+
+  // Sincronizar fecha temporal cuando se abre el modal o cambia la fecha real
+  useEffect(() => {
+    if (dateObject) {
+      setTempDate(dateObject);
+    }
+  }, [dateObject, showDatePicker]);
+
+  const handlePlatformDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+      if (event.type === "set" && selectedDate) {
+        actions.changeDate(selectedDate);
+      }
+    } else {
+      // En iOS solo actualizamos el estado temporal visual
+      if (selectedDate) setTempDate(selectedDate);
+    }
+  };
+
+  const confirmIOSDate = () => {
+    actions.changeDate(tempDate);
+    setShowDatePicker(false);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,11 +84,24 @@ export default function AppointmentScreen({
           <Text style={styles.headerTitle}>
             {isEditing ? "Editar Cita" : "Nueva Cita"}
           </Text>
-          <Text style={styles.headerDate}>{formState.date}</Text>
+
+          {/* BOTÓN DE FECHA MEJORADO */}
+          <TouchableOpacity
+            style={styles.dateSelector}
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.dateSelectorText}>{formState.date}</Text>
+            <Text style={styles.editIcon}>📅</Text>
+          </TouchableOpacity>
         </View>
 
+        {/* ... (Resto del contenido: Card, Tabs, Inputs, etc. SIN CAMBIOS) ... */}
+
+        {/* === PEGAR AQUÍ EL CONTENIDO DE TU PANTALLA ANTERIOR === */}
         <Card style={styles.mainCard}>
-          {/* SELECTOR DE MODO */}
+          {/* ... Código de tus tabs, inputs, services ... */}
+          {/* (Mantén todo el código que ya tenías dentro del ScrollView) */}
           <View style={styles.modeTabs}>
             <TouchableOpacity
               style={[
@@ -260,7 +304,7 @@ export default function AppointmentScreen({
           )}
         </Card>
 
-        {/* RESUMEN FINANCIERO */}
+        {/* RESUMEN FINANCIERO Y BOTONES (Igual que antes) */}
         <View style={styles.summaryContainer}>
           <Text style={styles.summaryTitle}>Resumen Financiero</Text>
           <View style={styles.summaryRow}>
@@ -327,11 +371,75 @@ export default function AppointmentScreen({
           </View>
         )}
       </ScrollView>
+
+      {/* --- LÓGICA DEL PICKER --- */}
+
+      {/* Opción 1: Picker Nativo para Android (Invisible hasta que se activa) */}
+      {Platform.OS === "android" && showDatePicker && (
+        <DateTimePicker
+          value={dateObject || new Date()}
+          mode="date"
+          display="default"
+          onChange={handlePlatformDateChange}
+          minimumDate={new Date(2024, 0, 1)}
+        />
+      )}
+
+      {/* Opción 2: Modal Customizado para iOS */}
+      {Platform.OS === "ios" && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              {/* Header del Modal */}
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.modalCancelText}>Cancelar</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>Seleccionar Fecha</Text>
+                <TouchableOpacity onPress={confirmIOSDate}>
+                  <Text style={styles.modalConfirmText}>Confirmar</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Picker iOS */}
+              <View
+                style={{
+                  width: "100%",
+                  alignItems: "center",
+                  backgroundColor: "white",
+                }}
+              >
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display="spinner" // O 'inline' si prefieres calendario completo
+                  onChange={handlePlatformDateChange}
+                  minimumDate={new Date(2024, 0, 1)}
+                  locale="es-ES"
+                  textColor="black"
+                  style={{
+                    height: 210,
+                    width: "100%", // <--- IMPORTANTE: Ocupar todo el ancho
+                    backgroundColor: "white",
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
 
+// --- ESTILOS ACTUALIZADOS ---
 const styles = StyleSheet.create({
+  // ... (Tus estilos existentes container, header, inputGroup, etc. COPIALOS AQUI)
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -345,14 +453,30 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     letterSpacing: -0.5,
   },
-  headerDate: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: "500",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginTop: 5,
+
+  // NUEVO: Estilo para el botón de fecha
+  dateSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5", // Un fondo suave para indicar que es tocable
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 8,
   },
+  dateSelectorText: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: "600",
+    textTransform: "capitalize", // Para que "sábado" sea "Sábado"
+  },
+  editIcon: {
+    marginLeft: 8,
+    fontSize: 14,
+  },
+
+  // ... (Resto de estilos existentes: mainCard, modeTabs, input, etc.) ...
   mainCard: {
     borderRadius: 24,
     padding: 24,
@@ -543,4 +667,44 @@ const styles = StyleSheet.create({
   },
   cancelButton: { marginTop: 5, alignItems: "center", padding: 10 },
   cancelButtonText: { color: COLORS.textLight, fontSize: 16 },
+
+  // --- ESTILOS DEL MODAL (NUEVO) ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)", // Fondo oscurecido
+    justifyContent: "flex-end", // Alineado al fondo (Estilo iOS sheet)
+  },
+  modalContent: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 30, // Espacio para el safe area inferior
+    width: "100%", // Asegurar ancho del contenedor
+    overflow: "hidden", // Para que respete los bordes redondeados
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEE",
+    backgroundColor: "#FAFAFA",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalTitle: {
+    fontWeight: "700",
+    fontSize: 16,
+    color: COLORS.textMain,
+  },
+  modalCancelText: {
+    color: COLORS.textLight,
+    fontSize: 16,
+  },
+  modalConfirmText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });

@@ -5,10 +5,11 @@
   "scripts": {
     "start": "expo start --clear",
     "android": "expo start --clear --android",
-    "ios": "expo start --ios",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
+    "@react-native-community/datetimepicker": "8.4.4",
     "expo": "~54.0.25",
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.8",

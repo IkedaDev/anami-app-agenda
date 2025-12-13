@@ -51,7 +51,6 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
         duration: appt.durationMinutes,
 
         hasNailCut: appt.hasNailCut,
-        // facialType ya no lo mapeamos porque ya no existe en el frontend
 
         selectedServiceIds: serviceIds,
         selectedTime: formatTime(appt.startsAt),
@@ -73,6 +72,11 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
   }
 
   async create(appointment: Appointment): Promise<Appointment> {
+    let durationToSend = appointment.duration;
+    if (appointment.serviceMode === "hotel" && appointment.hasNailCut) {
+      durationToSend = appointment.duration - 10;
+    }
+
     const payload = {
       clientId: appointment.patientId,
       serviceIds: appointment.selectedServiceIds,
@@ -80,9 +84,8 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
       locationType:
         appointment.serviceMode === "hotel" ? "HOTEL" : "PARTICULAR",
 
-      durationMinutes: appointment.duration,
+      durationMinutes: durationToSend, // <--- Usamos el valor ajustado
       hasNailCut: appointment.hasNailCut,
-      // facialType eliminado
     };
 
     const res = await httpClient.post<any>("/appointments", payload);
@@ -90,15 +93,20 @@ export class AppointmentRepositoryImpl implements IAppointmentRepository {
   }
 
   async update(appointment: Appointment): Promise<Appointment> {
+    // Misma lógica para el update
+    let durationToSend = appointment.duration;
+    if (appointment.serviceMode === "hotel" && appointment.hasNailCut) {
+      durationToSend = appointment.duration - 10;
+    }
+
     const payload = {
       serviceIds: appointment.selectedServiceIds,
       startsAt: new Date(appointment.scheduledStart).toISOString(),
       locationType:
         appointment.serviceMode === "hotel" ? "HOTEL" : "PARTICULAR",
 
-      durationMinutes: appointment.duration,
+      durationMinutes: durationToSend, // <--- Usamos el valor ajustado
       hasNailCut: appointment.hasNailCut,
-      // facialType eliminado
     };
 
     await httpClient.patch(`/appointments/${appointment.id}`, payload);

@@ -60,51 +60,87 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loadMoreAppointments = async () => {
+    // 1. GUARDIA ROBUSTA: Si no hay más o ya estamos cargando, detener.
     if (!hasMore || isLoadingMore || isLoading) return;
 
     setIsLoadingMore(true);
     try {
-      const { appointments: newApps, lastDoc: newCurrentPage } =
+      const { appointments: newApps, lastDoc: nextPage } =
         await repository.getPaginated(PAGE_SIZE, currentPage);
 
       if (newApps.length > 0) {
-        setAppointments((prev) => [...prev, ...newApps]);
-        setCurrentPage(newCurrentPage);
-        if (newApps.length < PAGE_SIZE) setHasMore(false);
+        // Filtro de duplicados (el fix anterior)
+        setAppointments((prev) => {
+          const existingIds = new Set(prev.map((a) => a.id));
+          const uniqueNewApps = newApps.filter((a) => !existingIds.has(a.id));
+          return [...prev, ...uniqueNewApps];
+        });
+      }
+
+      // 2. CORRECCIÓN RAÍZ:
+      // Si nextPage es null, el backend dice "se acabó".
+      if (nextPage) {
+        setCurrentPage(nextPage);
+        setHasMore(true);
       } else {
-        setHasMore(false);
+        setHasMore(false); // <--- Bloqueo definitivo
       }
     } catch (error) {
       console.error(error);
+      // Opcional: Si falla, detenemos la paginación para evitar reintentos locos
+      setHasMore(false);
     } finally {
       setIsLoadingMore(false);
     }
   };
 
   const addAppointment = async (appointment: Appointment) => {
-    // 1. Optimistic Update: La mostramos inmediatamente con el ID temporal
-    setAppointments((prev) => [appointment, ...prev]);
+    // 1. PREVENCIÓN DE DOBLE CLICK:
+    // Si la cita ya está en la lista (mismo ID temporal), no hacemos nada.
+    // Usamos el callback de setAppointments para tener el estado más fresco.
+    let isDuplicateRequest = false;
+    setAppointments((prev) => {
+      if (prev.some((a) => a.id === appointment.id)) {
+        isDuplicateRequest = true;
+        return prev;
+      }
+      // Si no existe, agregamos la versión Optimista (Temporal)
+      return [appointment, ...prev];
+    });
+
+    if (isDuplicateRequest) return;
 
     try {
-      // 2. Enviamos al backend y ESPERAMOS la respuesta (que trae el ID real)
+      // 2. Guardamos en el servidor
       const savedAppointment = await repository.create(appointment);
 
-      // 3. Reemplazamos silenciosamente la cita temporal por la real
-      setAppointments((prev) =>
-        prev.map((appt) =>
+      // 3. ACTUALIZACIÓN INTELIGENTE (EL FIX):
+      setAppointments((prev) => {
+        // ¿Ya existe la versión FINAL (ID real) en la lista?
+        // (Esto pasa si hubo un auto-refresh mientras esperábamos)
+        const realAlreadyExists = prev.some(
+          (a) => a.id === savedAppointment.id
+        );
+
+        if (realAlreadyExists) {
+          // Si ya llegó la real por otro lado, solo borramos la temporal para no tener clones.
+          return prev.filter((a) => a.id !== appointment.id);
+        }
+
+        // Si no existe la real, buscamos la temporal y la reemplazamos (Swap de ID)
+        return prev.map((appt) =>
           appt.id === appointment.id ? savedAppointment : appt
-        )
-      );
+        );
+      });
     } catch (error) {
       console.error(error);
-      // Si falla, quitamos la cita de la lista (Rollback)
+      // Rollback: Si falló, borramos la temporal
       setAppointments((prev) => prev.filter((a) => a.id !== appointment.id));
       Alert.alert("Error", "No se pudo guardar la cita en el servidor.");
     }
   };
 
   const updateAppointment = async (updatedAppointment: Appointment) => {
-    // Optimistic Update
     setAppointments((prev) =>
       prev.map((appt) =>
         appt.id === updatedAppointment.id ? updatedAppointment : appt
@@ -115,25 +151,23 @@ export const AppointmentProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "No se pudo actualizar la cita.");
-      // Aquí podrías recargar la lista para deshacer el cambio visual
       refreshAppointments();
     }
   };
+
   const cancelAppointment = async (id: string) => {
-    // 1. Optimistic Update: La quitamos de la lista inmediatamente
     const previousList = [...appointments];
     setAppointments((prev) => prev.filter((a) => a.id !== id));
 
     try {
-      // 2. Llamada al Backend (DELETE)
       await repository.delete(id);
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "No se pudo cancelar la cita en el sistema.");
-      // Rollback si falla
       setAppointments(previousList);
     }
   };
+
   return (
     <AppointmentContext.Provider
       value={{

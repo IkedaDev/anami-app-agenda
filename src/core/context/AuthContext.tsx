@@ -6,7 +6,7 @@ import React, {
   ReactNode,
 } from "react";
 import * as SecureStore from "expo-secure-store";
-import { httpClient } from "../api/http";
+import { httpClient, setUnauthorizedCallback } from "../api/http";
 
 interface AuthContextType {
   token: string | null;
@@ -21,8 +21,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const logout = async () => {
+    setToken(null);
+    await SecureStore.deleteItemAsync("auth_token");
+  };
+
   useEffect(() => {
-    // Verificar si hay sesión guardada al abrir la app
+    setUnauthorizedCallback(logout);
+
     const checkSession = async () => {
       try {
         const storedToken = await SecureStore.getItemAsync("auth_token");
@@ -39,7 +45,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, pass: string) => {
     setIsLoading(true);
     try {
-      // Llamada al endpoint de login que creamos en el backend
       const response = await httpClient.post<{
         success: boolean;
         data: { token: string };
@@ -59,11 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const logout = async () => {
-    setToken(null);
-    await SecureStore.deleteItemAsync("auth_token");
   };
 
   return (

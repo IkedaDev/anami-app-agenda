@@ -51,22 +51,26 @@ export const getTimestampForTime = (
 };
 
 export const isSameDay = (
-  timestamp1: number,
-  timestamp2: number = Date.now()
+  date1: Date | number | string,
+  date2: Date | number | string = new Date()
 ) => {
-  const d1 = new Date(timestamp1);
-  const d2 = new Date(timestamp2);
-  return (
-    d1.getDate() === d2.getDate() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getFullYear() === d2.getFullYear()
-  );
+  // Comparamos los strings "2023-12-25" generados en zona horaria Santiago
+  return toLocalISOString(date1) === toLocalISOString(date2);
 };
 
-export const isCurrentMonth = (timestamp: number) => {
-  const d = new Date(timestamp);
-  const now = new Date();
-  return (
-    d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-  );
+export const isCurrentMonth = (date: Date | number | string) => {
+  const d1Str = toLocalISOString(date); // Ej: "2023-12-05"
+  const nowStr = toLocalISOString(new Date()); // Ej: "2023-12-23"
+
+  // Comparamos solo "2023-12"
+  return d1Str.substring(0, 7) === nowStr.substring(0, 7);
+};
+
+// Helper nuevo para saber si una fecha es "Hoy o Futuro" en Santiago
+export const isTodayOrFuture = (date: Date | number | string) => {
+  const targetDate = toLocalISOString(date);
+  const todaySantiago = toLocalISOString(new Date());
+
+  // Comparación alfabética de strings ISO funciona cronológicamente
+  return targetDate >= todaySantiago;
 };

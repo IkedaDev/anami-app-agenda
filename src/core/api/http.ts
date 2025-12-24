@@ -9,6 +9,12 @@ export const API_CONFIG = {
   },
 };
 
+let onUnauthorized: () => void = () => {};
+
+export const setUnauthorizedCallback = (callback: () => void) => {
+  onUnauthorized = callback;
+};
+
 const getHeaders = async () => {
   const token = await SecureStore.getItemAsync("auth_token");
   return {
@@ -17,6 +23,19 @@ const getHeaders = async () => {
   };
 };
 
+const handleResponse = async (response: Response) => {
+  if (response.status === 401) {
+    onUnauthorized(); // Ejecuta el logout si es 401
+    throw new Error("Sesión expirada");
+  }
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || `Error HTTP ${response.status}`);
+  }
+  // Si es un 204 No Content, retornar null o undefined, si no, json
+  if (response.status === 204) return null;
+  return await response.json();
+};
 export const httpClient = {
   get: async <T>(endpoint: string): Promise<T> => {
     const headers = await getHeaders();
@@ -24,9 +43,7 @@ export const httpClient = {
       method: "GET",
       headers: headers as any,
     });
-    if (!response.ok)
-      throw new Error(`Error GET ${endpoint} - ${response.status}`);
-    return await response.json();
+    return handleResponse(response);
   },
 
   post: async <T>(endpoint: string, body: any): Promise<T> => {
@@ -36,11 +53,7 @@ export const httpClient = {
       headers: headers as any,
       body: JSON.stringify(body),
     });
-    if (!response.ok) {
-      const errorBody = await response.json();
-      throw new Error(errorBody.message || `Error POST ${endpoint}`);
-    }
-    return await response.json();
+    return handleResponse(response);
   },
 
   patch: async <T>(endpoint: string, body: any): Promise<T> => {
@@ -50,8 +63,7 @@ export const httpClient = {
       headers: headers as any,
       body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`Error PATCH ${endpoint}`);
-    return await response.json();
+    return handleResponse(response);
   },
 
   delete: async (endpoint: string): Promise<void> => {
@@ -60,6 +72,6 @@ export const httpClient = {
       method: "DELETE",
       headers: headers as any,
     });
-    if (!response.ok) throw new Error(`Error DELETE ${endpoint}`);
+    return handleResponse(response) as any;
   },
 };

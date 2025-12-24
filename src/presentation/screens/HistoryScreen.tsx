@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -34,15 +34,16 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
   const { services } = useServices();
 
   const [viewMode, setViewMode] = useState<"today" | "month" | "all">("today");
+  const onEndReachedCalledDuringMomentum = useRef(true);
 
   const filteredAppointments = useMemo(() => {
     if (viewMode === "all") {
       return appointments;
     }
     if (viewMode === "month") {
-      return appointments.filter((appt) => isCurrentMonth(appt.createdAt));
+      return appointments.filter((appt) => isCurrentMonth(appt.scheduledStart));
     }
-    return appointments.filter((appt) => isSameDay(appt.createdAt));
+    return appointments.filter((appt) => isSameDay(appt.scheduledStart));
   }, [appointments, viewMode]);
 
   const stats = useMemo(() => {
@@ -68,7 +69,10 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
   }, [filteredAppointments]);
 
   const renderItem = ({ item }: { item: Appointment }) => {
-    const editable = isSameDay(item.createdAt);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    // const editable = isSameDay(item.createdAt);
+    const editable = item.createdAt >= now.getTime();
     const isHotel = item.serviceMode === "hotel";
 
     const getParticularDetails = () => {
@@ -248,8 +252,24 @@ export default function HistoryScreen({ onEdit }: HistoryScreenProps) {
           renderItem={renderItem}
           ListHeaderComponent={ListHeader}
           contentContainerStyle={styles.listContent}
-          onEndReached={loadMoreAppointments}
-          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            // Solo ejecutamos si NO estamos bloqueados por el momentum
+            if (
+              !onEndReachedCalledDuringMomentum.current &&
+              viewMode === "all"
+            ) {
+              loadMoreAppointments();
+              onEndReachedCalledDuringMomentum.current = true; // Bloquear hasta el próximo scroll
+            }
+          }}
+          onEndReachedThreshold={0.2}
+          onMomentumScrollBegin={() => {
+            onEndReachedCalledDuringMomentum.current = false;
+          }}
+          removeClippedSubviews={true}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
           ListFooterComponent={renderFooter}
           refreshControl={
             <RefreshControl

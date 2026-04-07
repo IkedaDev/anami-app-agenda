@@ -42,17 +42,17 @@ export const toLocalISOString = (date: Date | number | string) => {
 
 export const getTimestampForTime = (
   baseDate: Date,
-  timeStr: string
+  timeStr: string,
 ): number => {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  const date = new Date(baseDate);
-  date.setHours(hours, minutes, 0, 0);
-  return date.getTime();
+  const dateStr = toLocalISOString(baseDate); // "2024-04-07"
+  // Al crear el Date así, el navegador/teléfono usa su zona horaria actual
+  const localDate = new Date(`${dateStr}T${timeStr}:00`);
+  return localDate.getTime();
 };
 
 export const isSameDay = (
   date1: Date | number | string,
-  date2: Date | number | string = new Date()
+  date2: Date | number | string = new Date(),
 ) => {
   // Comparamos los strings "2023-12-25" generados en zona horaria Santiago
   return toLocalISOString(date1) === toLocalISOString(date2);

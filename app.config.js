@@ -26,7 +26,8 @@ module.exports = ({ config }) => {
     version: "1.0.1",
     android: {
       ...config.android,
-      versionCode: Number(count), // Forzamos que sea número
+      // Usamos 'count' que es la variable definida arriba
+      versionCode: count,
     },
     extra: {
       ...config.extra,

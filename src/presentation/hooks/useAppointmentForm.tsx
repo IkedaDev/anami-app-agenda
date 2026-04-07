@@ -45,7 +45,7 @@ const generateAllDailySlots = () => {
   for (let h = 8; h < 23; h++) {
     for (let m = 0; m < 60; m += 10) {
       slots.push(
-        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`,
       );
     }
   }
@@ -56,7 +56,7 @@ const generateAllDailySlots = () => {
 
 export const useAppointmentForm = (
   appointmentToEdit?: Appointment | null,
-  onSuccess?: () => void
+  onSuccess?: () => void,
 ) => {
   const { addAppointment, updateAppointment, cancelAppointment } =
     useAppointments();
@@ -87,7 +87,7 @@ export const useAppointmentForm = (
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [availableSlotsFromApi, setAvailableSlotsFromApi] = useState<string[]>(
-    []
+    [],
   );
   const [loadingSlots, setLoadingSlots] = useState(false);
 
@@ -147,22 +147,17 @@ export const useAppointmentForm = (
     services,
   ]);
 
-  // --- SLOTS VISUALES ---
   const timeSlots = useMemo(() => {
     const allSlots = generateAllDailySlots();
     const now = new Date();
+    const isEditing = !!appointmentToEdit; // Detectamos si es edición
 
     const mappedSlots = allSlots.map((time) => {
-      // Usamos selectedDate (baseDate) para calcular el timestamp
       const slotStart = getTimestampForTime(baseDate, time);
-
-      // Lógica: Si es HOY, bloqueamos pasado. Si es FUTURO, no bloqueamos.
-      // Si es PASADO (ayer), bloqueamos todo (o lo dejas abierto si quieres agendar retroactivo)
       const isToday = isSameDay(baseDate.getTime(), now.getTime());
-      const isPastTime = isToday && slotStart < now.getTime() - 60000;
 
-      // Nota: Si quieres permitir agendar en días pasados, ajusta esta lógica.
-      // Aquí asumimos que si cambias de día, quieres ver los slots libres de ese día.
+      // Margen de 1 minuto para evitar bloqueos por segundos
+      const isPastTime = isToday && slotStart < now.getTime() - 60000;
 
       const isAvailable =
         availableSlotsFromApi.includes(time) ||
@@ -170,22 +165,23 @@ export const useAppointmentForm = (
 
       return {
         time,
-        available: !isPastTime && isAvailable, // Si es futuro, isPastTime será false siempre que slotStart > now
+        // 👇 MODIFICACIÓN: Si estamos editando, ignoramos 'isPastTime' para la disponibilidad
+        available: (isEditing ? true : !isPastTime) && isAvailable,
         isPast: isPastTime,
       };
     });
 
-    if (isSameDay(baseDate.getTime(), now.getTime())) {
+    // Filtro de visualización:
+    // Si es hoy y NO estamos editando, filtramos para no ver el pasado.
+    // Si estamos editando, mostramos todos los horarios del día.
+    if (isSameDay(baseDate.getTime(), now.getTime()) && !isEditing) {
       const futureSlots = mappedSlots.filter((s) => !s.isPast);
       const firstAvailableIndex = futureSlots.findIndex((s) => s.available);
       return firstAvailableIndex === -1
         ? []
         : futureSlots.slice(firstAvailableIndex);
-    } else if (baseDate.getTime() > now.getTime()) {
-      // Futuro: Mostrar todo
-      return mappedSlots;
     } else {
-      // Pasado: Mostrar todo (por si quiere registrar algo que ya hizo) o nada
+      // Para días futuros o cuando estamos EDITANDO, mostramos el día completo
       return mappedSlots;
     }
   }, [availableSlotsFromApi, baseDate, appointmentToEdit]);
@@ -221,7 +217,7 @@ export const useAppointmentForm = (
         const slots = await appointmentRepo.getAvailability(
           dateStr,
           currentDuration,
-          appointmentToEdit?.id
+          appointmentToEdit?.id,
         );
         if (isActive) setAvailableSlotsFromApi(slots);
       } catch (error) {
@@ -243,7 +239,7 @@ export const useAppointmentForm = (
     if (!appointmentToEdit && timeSlots.length > 0) {
       const firstSlot = timeSlots[0];
       const currentValid = timeSlots.find(
-        (s) => s.time === formState.selectedTime
+        (s) => s.time === formState.selectedTime,
       )?.available;
 
       if (!formState.selectedTime || !currentValid) {
@@ -360,7 +356,7 @@ export const useAppointmentForm = (
 
         const startTimestamp = getTimestampForTime(
           baseDate,
-          formState.selectedTime
+          formState.selectedTime,
         );
         const endTimestamp = startTimestamp + currentDuration * 60 * 1000;
 

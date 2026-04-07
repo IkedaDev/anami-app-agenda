@@ -10,7 +10,7 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
-  Modal, // Necesario para iOS
+  Modal,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { COLORS } from "../../core/theme/colors";
@@ -20,6 +20,7 @@ import { OptionButton } from "../components/OptionButton";
 import { SectionTitle } from "../components/SectionTitle";
 import { Appointment } from "../../domain/models/appointment";
 import { Card } from "../components/Card";
+import { AppVersion } from "../components/AppVersion";
 
 interface AppointmentScreenProps {
   appointmentToEdit?: Appointment | null;
@@ -184,7 +185,7 @@ export default function AppointmentScreen({
                 <View style={styles.servicesGrid}>
                   {services.map((service) => {
                     const isSelected = formState.selectedServiceIds.includes(
-                      service.id
+                      service.id,
                     );
                     return (
                       <TouchableOpacity
@@ -396,6 +397,8 @@ export default function AppointmentScreen({
             </TouchableOpacity>
           </View>
         )}
+
+        <AppVersion />
       </ScrollView>
 
       {/* --- MODALES --- */}
@@ -463,7 +466,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7F8FA", // Fondo más moderno
     paddingTop: Platform.OS === "android" ? 30 : 0,
   },
-  scrollContent: { padding: 20, paddingBottom: 50 },
+  scrollContent: { padding: 20 },
 
   // Header
   header: { marginBottom: 20, marginTop: 10 },

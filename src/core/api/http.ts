@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
+console.log("Connect to: " + process.env.EXPO_PUBLIC_API_URL);
 export const API_CONFIG = {
   // Usamos la variable de entorno o un fallback
   BASE_URL: process.env.EXPO_PUBLIC_API_URL,

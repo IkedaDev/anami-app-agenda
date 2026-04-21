@@ -23,7 +23,7 @@ const { count, hash } = getGitInfo();
 module.exports = ({ config }) => {
   return {
     ...config,
-    version: "1.0.1",
+    version: "1.0.2",
     android: {
       ...config.android,
       // Usamos 'count' que es la variable definida arriba
